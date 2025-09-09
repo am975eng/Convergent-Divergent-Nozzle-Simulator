@@ -1,0 +1,89 @@
+/* style.qss */
+/* Main application styles */
+
+/* Global styles */
+QWidget {
+    background-color: #1c1c20;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+}
+
+/* Button styles */
+QPushButton {
+    background-color: #5895c7;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    min-width: 80px;
+}
+
+QPushButton:hover {
+    background-color: #2259ac;
+}
+
+QPushButton:pressed {
+    background-color: #091e7a;
+}
+
+QPushButton:disabled {
+    background-color: #cccccc;
+    color: #666666;
+}
+
+/* Special button class */
+QPushButton.primary {
+    background-color: #2196F3;
+}
+
+QPushButton.primary:hover {
+    background-color: #0b7dda;
+}
+
+/* Label styles */
+QLabel {
+    color: #fafafa;
+    padding: 4px;
+}
+
+QLabel.title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+/* Text input styles */
+QLineEdit {
+    border: 1px solid #cccccc;
+    border-radius: 3px;
+    padding: 6px;
+    background-color: white;
+}
+
+QLineEdit:focus {
+    border: 2px solid #2196F3;
+}
+
+/* Checkbox styles */
+QCheckBox {
+    spacing: 5px;
+}
+
+QCheckBox::indicator {
+    width: 13px;
+    height: 13px;
+}
+
+QCheckBox::indicator:unchecked {
+    border: 1px solid #cccccc;
+    background-color: white;
+}
+
+QCheckBox::indicator:checked {
+    border: 1px solid #2196F3;
+    background-color: #2196F3;
+}
+
+QComboBox {
+    color: white;
+}
