@@ -1,18 +1,25 @@
 import sys
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QGridLayout, QLineEdit
 from pathlib import Path
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QMainWindow, QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QComboBox, QGridLayout, QLineEdit, QSpacerItem, QSizePolicy
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.collections import LineCollection
+from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import numpy as np
-from PyQt6.QtWidgets import QSpacerItem, QSizePolicy
 import math
+import matplotlib as mpl
 from scipy.optimize import root_scalar
 
 class MplCanvas(FigureCanvas):
+    """
+    Matplotlib canvas generated using Agg engine that can function as a QWidget.
+    """
     def __init__(self, parent=None):
-        # Create the figure and axes
+        """
+        Initializes the instance with a figure and subplot axes and sets style properties.
+        """
         self.fig = Figure(figsize=(7, 8))
         self.fig.patch.set_alpha(0)
         self.axes = self.fig.add_subplot(411)
@@ -35,11 +42,14 @@ class MplCanvas(FigureCanvas):
 
 
 class MyWindow(QMainWindow):
+    """
+    Main application window inherited from QMainWindow.
+    """
     def __init__(self):
         super().__init__()
         self.load_styles()
         self.init_UI()
-    
+
     def load_styles(self):
         """Load styles from QSS file"""
         try:
@@ -47,7 +57,7 @@ class MyWindow(QMainWindow):
             current_dir = Path(__file__).parent
             style_file = current_dir / "style.qss"
             print(f"Loading styles from {style_file}")
-            
+           
             with open(style_file, "r") as f:
                 stylesheet = f.read()
                 self.setStyleSheet(stylesheet)
@@ -58,6 +68,7 @@ class MyWindow(QMainWindow):
             print(f"Error loading styles: {e}")    
     
     def init_UI(self):
+        """Sets up UI by creating and positioning widgets."""
         # Set window properties
         self.setWindowTitle("CGT Designer")
         widget = QWidget()
@@ -168,6 +179,8 @@ class MyWindow(QMainWindow):
         QSizePolicy.Policy.Expanding, # horizontal policy (absorbs all extra horizontal space)
         QSizePolicy.Policy.Minimum    # vertical policy (doesn’t expand sideways)
         )
+        option_layout.addItem(v_spacer, 11, 0, 1, 2)
+        
         option_layout.addWidget(results_label, 12, 0)
         option_layout.addWidget(self.result_display_label, 13, 0, 1, 2)
         option_layout.addWidget(P_e_sup_label, 14, 0)
@@ -183,14 +196,10 @@ class MyWindow(QMainWindow):
         option_layout.addWidget(thrust_label, 18, 1)
         option_layout.addWidget(self.thrust_val, 19, 1)
 
-        # Add to grid layout at row 7, spanning 2 columns
-        option_layout.addItem(v_spacer, 11, 0, 1, 2)
-        
         graphic_layout = QVBoxLayout()
         self.canvas = MplCanvas(self)
         graphic_layout.addWidget(self.canvas)
         
-
         outer_layout = QHBoxLayout()
         outer_layout.addLayout(option_layout)
         outer_layout.addSpacerItem(h_spacer)
@@ -204,7 +213,8 @@ class MyWindow(QMainWindow):
 
     def update_result(self):
         """
-        Main function that gets triggered by a UI event. Extracts UI data and generates a new flow plot"""
+        Main function that gets triggered by a UI event. Extracts UI data and recalculates flow thermodynamics.
+        """
         def reflect_plot(self):
             lines = self.canvas.axes.get_lines()
             for line in lines:
@@ -261,16 +271,31 @@ class MyWindow(QMainWindow):
         # Throat Conditions
         T_star = T_0 * (2/(self.k+1))
         P_star = P_0 * ((2/(self.k+1))**(self.k/(self.k-1)))
-        M_sonic = 1
+        self.M_throat = 1
 
         #self.m_dot = math.pi*(r_throat**2)*P_0*(((self.k/(self.R_spec*T_0)))**0.5)*((2/(self.k+1))**((self.k+1)/(2*(self.k-1))))
                
-        def P_mach(M, p_ratio):
-            # P_ratio = P_0/P
-            P_mach = (-M)+(((p_ratio**((self.k-1)/self.k))-1)**(2/(self.k-1)))**0.5
-            return P_mach
+        def Mach_Press_Isen(M, P_0, P):
+            """
+            Function to calculate Mach number at a point using isentropic relation and stagnation pressure.
+            
+            Args:
+                M - Mach number to be swept using root_scalar
+                p_ratio - Stagnation pressure ratio
+            """
+            Mach_Press_Isen = (-M)+((((P_0/P)**((self.k-1)/self.k))-1)*(2/(self.k-1)))**0.5
+            return Mach_Press_Isen
         
         def Area_Mach_x_y(M_y, M_x, A_y, A_x):
+            """
+            Isentropic area-Mach relation.
+            
+            Args:
+                M_y - Mach number at y point
+                M_x - Mach number at x point
+                A_y - Area at y point
+                A_x - Area at x point
+            """
             expon = (self.k+1)/(self.k-1)
             term_x = 1 + ((self.k-1)/2)*M_x*M_x
             term_y = 1 + ((self.k-1)/2)*M_y*M_y
@@ -278,13 +303,19 @@ class MyWindow(QMainWindow):
             return Area_Mach_x_y
         
         def calc_isen_press(M,P):
-            # Uses isentropic relation to calculate pressure at a point using stagnation conditions.
+            """
+            Uses isentropic relation to calculate pressure at a point using stagnation conditions.
+            
+            Args:
+                M - Mach number at point of interest
+                P - Stagnation pressure
+            """
             return P / (((1+ ((self.k-1)/2) * M * M))**(self.k/(self.k-1)))
 
         # Solve for supersonic and subsonic exit conditions
         try:
-            M_e_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(M_sonic,A_outlet,A_star)).root
-            M_e_sub = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_sonic,A_outlet,A_star)).root
+            M_e_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_outlet,A_star)).root
+            M_e_sub = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star)).root
         except ValueError as e:
             print("Unable to solve for Mach numbers. Expand solver bracket to ensure solution exists.")
 
@@ -301,7 +332,7 @@ class MyWindow(QMainWindow):
             shock_flag = False  # If shock calc. succeeds iterate with this shock location
             self.x_shock = None # Shock location
             A_x = math.pi*(y_div[-1]**2)
-            M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(M_sonic,A_x,A_star)).root
+            M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
             P_x = calc_isen_press(M_x_sup,P_0)
             T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
             M_y = ((M_x_sup**2 + (2/(self.k-1)))/((2*self.k/(self.k-1))*M_x_sup*M_x_sup-1))**0.5
@@ -310,12 +341,12 @@ class MyWindow(QMainWindow):
             T_0_y = T_0
 
             A_star_shock = A_x * M_y * (((2/(self.k+1))*(1+((self.k-1)/2)*M_y*M_y))**((-self.k-1)/(2*self.k-2)))
-            M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_sonic,A_outlet,A_star_shock)).root   
+            M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock)).root   
             P_e_shock = calc_isen_press(M_y_e,P_0_y)
             self.P_e_shock_val.setText("{:.1f}".format(P_e_shock))
 
             A_x = math.pi*(y_div[1]**2)
-            M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(M_sonic,A_x,A_star)).root
+            M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
             P_x = calc_isen_press(M_x_sup,P_0)
             T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
             M_y = ((M_x_sup**2 + (2/(self.k-1)))/((2*self.k/(self.k-1))*M_x_sup*M_x_sup-1))**0.5
@@ -324,7 +355,7 @@ class MyWindow(QMainWindow):
             T_0_y = T_0
 
             A_star_shock = A_x * M_y * (((2/(self.k+1))*(1+((self.k-1)/2)*M_y*M_y))**((-self.k-1)/(2*self.k-2)))
-            M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_sonic,A_outlet,A_star_shock)).root   
+            M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock)).root   
             P_star_shock = calc_isen_press(M_y_e,P_0_y)
             self.P_star_shock_val.setText("{:.1f}".format(P_star_shock))
 
@@ -333,8 +364,10 @@ class MyWindow(QMainWindow):
             elif P_amb >= self.P_e_sub:
                 # Back pressure is too high for choked subsonic flow
                 self.result_display_label.setText("Back pressure too high for choked subsonic flow")
-                M_e_sub = root_scalar(P_mach, bracket=[0.0001,1], args=(P_0/self.P_e_sub)).root
-                
+                M_e_sub = root_scalar(Mach_Press_Isen, bracket=[0.0001,1], args=(P_0,P_amb)).root
+                print(f"Not choked exit mach: {M_e_sub}")
+                self.M_throat = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_e_sub,A_star,A_outlet)).root
+                print(f"Not choked Throat Mach: {self.M_throat}")
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
@@ -354,7 +387,7 @@ class MyWindow(QMainWindow):
                     shift = index + len(x_conv)
                     if not shock_flag:
                         # Pre shock wave prop
-                        M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(M_sonic,A_x,A_star)).root
+                        M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
                         P_x = calc_isen_press(M_x_sup,P_0)
                         T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
                         self.P_array[shift] = P_x
@@ -368,7 +401,7 @@ class MyWindow(QMainWindow):
                         T_0_y = T_0
 
                         A_star_shock = A_x * M_y * (((2/(self.k+1))*(1+((self.k-1)/2)*M_y*M_y))**((-self.k-1)/(2*self.k-2)))
-                        M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_sonic,A_outlet,A_star_shock)).root   
+                        M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock)).root   
                         P_y_e = calc_isen_press(M_y_e,P_0_y)
                         T_y_e = T_0_y * ((1+ ((self.k-1)/2)*M_y_e*M_y_e)**-1)
 
@@ -378,7 +411,7 @@ class MyWindow(QMainWindow):
                             self.x_shock = x_div[index]
                             self.result_display_label.setText(f'Normal shock generated in divergent section at {self.x_shock:.3f} m')
                     elif shock_flag:
-                        M_y_curr = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_sonic,A_x,A_star_shock)).root
+                        M_y_curr = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_x,A_star_shock)).root
                         P_y_curr = calc_isen_press(M_y_curr, P_0_y)
                         T_y_curr = T_0_y * ((1+ ((self.k-1)/2)*M_y_curr*M_y_curr)**-1)
                         self.P_array[shift] = P_y_curr
@@ -394,7 +427,7 @@ class MyWindow(QMainWindow):
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
-                    M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(M_sonic,A_x,A_star)).root
+                    M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
                     P_x = calc_isen_press(M_x_sup,P_0)
                     T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
                     self.P_array[shift] = P_x
@@ -406,7 +439,7 @@ class MyWindow(QMainWindow):
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
-                    M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(M_sonic,A_x,A_star)).root
+                    M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
                     P_x = calc_isen_press(M_x_sup,P_0)
                     T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
                     self.P_array[shift] = P_x
@@ -422,19 +455,17 @@ class MyWindow(QMainWindow):
             self.m_dot = self.rho_e * A_outlet * self.M_e * self.c_e 
             self.m_dot_val.setText(f"{self.m_dot:.3f} kg/s")
 
-
+        iter_div_sect()
         for index in range(len(x_conv)):
             A_x = math.pi*(y_conv[index]**2)
-            M_x_sub = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_sonic,A_x,A_star)).root
+            M_x_sub = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_x,A_star)).root
             P_x = calc_isen_press(M_x_sub,P_0)
             T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sub*M_x_sub)**-1)
 
             self.P_array[index] = P_x
             self.M_array[index] = M_x_sub
             self.T_array[index] = T_x
-
-        iter_div_sect()
-                                 
+             
         # Thrust Calc
         c_e = math.sqrt(self.k*self.R_spec*self.T_e)
         V_e = self.M_e * c_e
@@ -450,11 +481,24 @@ class MyWindow(QMainWindow):
         self.canvas.axes.title.set_color('white')
 
         self.canvas.axes_2.clear()
-        self.canvas.axes_2.plot(np.concatenate([x_conv, x_div]), self.P_array, 'b-', linewidth=2)
+        def gen_cmap_plot(x,y,ax):
+            points = np.array([x, y]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            cmap = plt.cm.RdYlBu 
+            norm = mpl.colors.Normalize(vmin=np.min(-y), vmax=np.max(-y))  # <-- added
+            lc = LineCollection(segments, cmap=cmap, norm=norm, linewidth=1)
+            lc.set_array(-y) 
+            
+            ax.add_collection(lc)
+            range = np.max(y) - np.min(y)
+            ax.set_xlim(np.min(x), np.max(x))
+            ax.set_ylim(np.min(y) - 0.1*range, np.max(y)+0.15*range)
+ 
+        gen_cmap_plot(np.concatenate([x_conv, x_div]), self.P_array, self.canvas.axes_2)
         self.canvas.axes_3.clear()
-        self.canvas.axes_3.plot(np.concatenate([x_conv, x_div]), self.M_array, 'b-', linewidth=2)
+        gen_cmap_plot(np.concatenate([x_conv, x_div]), self.M_array, self.canvas.axes_3)
         self.canvas.axes_4.clear()
-        self.canvas.axes_4.plot(np.concatenate([x_conv, x_div]), self.T_array, 'b-', linewidth=2)
+        gen_cmap_plot(np.concatenate([x_conv, x_div]), self.T_array, self.canvas.axes_4)
 
         self.canvas.axes.set_ylabel('Y Position [m]', color='white')
         self.canvas.axes_2.set_ylabel('Pressure [Pa]', color='white')
@@ -463,7 +507,6 @@ class MyWindow(QMainWindow):
         self.canvas.axes_4.set_xlabel('X Position [m]', color='white')
         # Refresh canvas
         self.canvas.draw()
-
         
 
 if __name__ == "__main__":
