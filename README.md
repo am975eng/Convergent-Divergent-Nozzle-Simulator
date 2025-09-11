@@ -7,7 +7,7 @@ Initially the code assumes 1D steady adiabatic isentropic flow with an ideal gas
 # Getting Started
 
 ## Installation
-The code is built with Python 3.12 and requires the following modules listed in requirements.txt
+The code is built with Python 3 and dependencies can be installed using the following.
 
 1.  Clone the repository:
     ```bash
@@ -17,8 +17,9 @@ The code is built with Python 3.12 and requires the following modules listed in 
 
 2.  (Recommended) Create and activate a virtual environment:
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    python -m venv test_venv
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass # If first time using venv
+    test_venv\Scripts\activate.ps1  # Windows
     ```
 
 3.  Install the dependencies:

@@ -11,6 +11,7 @@ import numpy as np
 import math
 import matplotlib as mpl
 from scipy.optimize import root_scalar
+from scipy.optimize import fsolve
 
 class MplCanvas(FigureCanvas):
     """
@@ -23,9 +24,9 @@ class MplCanvas(FigureCanvas):
         self.fig = Figure(figsize=(7, 8))
         self.fig.patch.set_alpha(0)
         self.axes = self.fig.add_subplot(411)
-        self.axes_2 = self.fig.add_subplot(412, sharex=self.axes)
-        self.axes_3 = self.fig.add_subplot(413, sharex=self.axes)
-        self.axes_4 = self.fig.add_subplot(414, sharex=self.axes)
+        self.axes_2 = self.fig.add_subplot(412)
+        self.axes_3 = self.fig.add_subplot(413)
+        self.axes_4 = self.fig.add_subplot(414)
         # self.axes.set_aspect("equal")
 
         all_axes = [self.axes, self.axes_2, self.axes_3, self.axes_4]
@@ -226,6 +227,11 @@ class MyWindow(QMainWindow):
                     linestyle=line.get_linestyle(),
                     linewidth=line.get_linewidth())  # Slightly transparent
 
+        self.canvas.axes.clear()            
+        self.canvas.axes_2.clear()
+        self.canvas.axes_3.clear()
+        self.canvas.axes_4.clear()
+        
         # Gas specific properties       
         if self.prop_list.currentText() == "Air":
             self.R_spec = 287
@@ -324,7 +330,7 @@ class MyWindow(QMainWindow):
         self.P_e_sup_val.setText("{:.4g}".format(self.P_e_sup))
         self.P_e_sub_val.setText("{:.4g}".format(self.P_e_sub))
         
-        def iter_div_sect():
+        def iter_div_sect(self):
             """
             Iterates through the divergent section to determine if flow is supersonic or subsonic and iterates shock
             location until back and exit pressure match.
@@ -365,9 +371,8 @@ class MyWindow(QMainWindow):
                 # Back pressure is too high for choked subsonic flow
                 self.result_display_label.setText("Back pressure too high for choked subsonic flow")
                 M_e_sub = root_scalar(Mach_Press_Isen, bracket=[0.0001,1], args=(P_0,P_amb)).root
-                print(f"Not choked exit mach: {M_e_sub}")
                 self.M_throat = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_e_sub,A_star,A_outlet)).root
-                print(f"Not choked Throat Mach: {self.M_throat}")
+                
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
@@ -433,6 +438,24 @@ class MyWindow(QMainWindow):
                     self.P_array[shift] = P_x
                     self.M_array[shift] = M_x_sup
                     self.T_array[shift] = T_x
+
+                # Oblique shock
+                def over_shock_eqn(vars, M_1, P_1, P_2):
+                    beta, theta = vars
+                    M_1_n = M_1 * np.sin(beta)
+                    eqn1 = -(P_2/P_1) + (2*self.k*M_1_n*M_1_n-self.k+1)/(self.k+1)
+                    eqn2 = -np.tan(theta) + (2*(1/np.tan(beta))*(M_1*M_1*np.sin(beta)*np.sin(beta)-1))/(M_1*M_1*(self.k+np.cos(2*beta))+2)
+                    #M_2_n = M_2 * np.sin(beta-theta)
+                    return [eqn1, eqn2]
+                
+                beta, theta = fsolve(over_shock_eqn,[np.radians(45),np.radians(45)],args=(self.M_array[-1],self.P_array[-1],P_amb))
+                # print(f"Beta: {beta*180/np.pi:.2f} degrees, Theta: {theta*180/np.pi:.2f} degrees")
+                x_over_shock_1 = x_div[-1]
+                y_over_shock_1 = y_div[-1]
+                x_over_shock_2 = x_over_shock_1 + y_over_shock_1 * np.cos(beta)
+                y_over_shock_2 = y_over_shock_1 - y_over_shock_1 * np.sin(beta)
+                self.canvas.axes.plot([x_over_shock_1,x_over_shock_2],[y_over_shock_1,y_over_shock_2], 'g-')
+                
             else:
                 # Underexpanded nozzle
                 self.result_display_label.setText('Underexpanded supersonic exhaust')
@@ -455,7 +478,7 @@ class MyWindow(QMainWindow):
             self.m_dot = self.rho_e * A_outlet * self.M_e * self.c_e 
             self.m_dot_val.setText(f"{self.m_dot:.3f} kg/s")
 
-        iter_div_sect()
+        iter_div_sect(self)
         for index in range(len(x_conv)):
             A_x = math.pi*(y_conv[index]**2)
             M_x_sub = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_x,A_star)).root
@@ -471,16 +494,16 @@ class MyWindow(QMainWindow):
         V_e = self.M_e * c_e
         Thr = self.m_dot * V_e + (self.P_e - P_amb) * A_outlet
         self.thrust_val.setText("{:.3g}".format(Thr))
-        # Clear previous plot
-        self.canvas.axes.clear()
+        
         # Plot data
         self.canvas.axes.plot(x_conv, y_conv, 'b-', linewidth=2)
-        self.canvas.axes.plot(x_div, y_div, 'b-', linewidth=2)        
+        self.canvas.axes.plot(x_div, y_div, 'b-', linewidth=2)   
+        
         reflect_plot(self)
         self.canvas.axes.grid(True)
         self.canvas.axes.title.set_color('white')
+        
 
-        self.canvas.axes_2.clear()
         def gen_cmap_plot(x,y,ax):
             points = np.array([x, y]).T.reshape(-1, 1, 2)
             segments = np.concatenate([points[:-1], points[1:]], axis=1)
@@ -495,9 +518,7 @@ class MyWindow(QMainWindow):
             ax.set_ylim(np.min(y) - 0.1*range, np.max(y)+0.15*range)
  
         gen_cmap_plot(np.concatenate([x_conv, x_div]), self.P_array, self.canvas.axes_2)
-        self.canvas.axes_3.clear()
         gen_cmap_plot(np.concatenate([x_conv, x_div]), self.M_array, self.canvas.axes_3)
-        self.canvas.axes_4.clear()
         gen_cmap_plot(np.concatenate([x_conv, x_div]), self.T_array, self.canvas.axes_4)
 
         self.canvas.axes.set_ylabel('Y Position [m]', color='white')
