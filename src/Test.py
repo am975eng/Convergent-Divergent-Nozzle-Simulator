@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import root_scalar
 import math
-
+from numpy import tan
 def A_mach_crit(M, a_ratio):
     # Area-Mach Relation Function
     term = (2 / (k + 1)) * (1 + (k - 1) * (M**2) / 2)
@@ -48,10 +48,11 @@ except ValueError as e:
 P_e_sup = calc_isen_press(M_e_sup,P_0)
 P_e_sub = calc_isen_press(M_e_sub,P_0)
 
-print(f"Supersonic Pressure: {P_e_sup}")
-print(f"Supersonic Mach: {M_e_sup}")
 
-print(f"Supersonic Mach 2: {M_e_sup_2}")
-
-print(f"Subsonic Mach : {M_e_sub}")
-print(f"Subsonic Mach 2: {M_e_sub_2}")
+X_T * tan(beta_1) = H - H_m
+X_D * tan(theta_1) = H - Y_D
+(X_D-X_T)*tan(beta_2-theta_1) = Y_D - H_m
+(X_F-X_T) * tan(theta_3) = H_m - Y_F
+(X_E-X_D) * tan(mu_D) = Y_D - H_s
+(X_F-X_D) * tan(mu_2 + theta_3) = Y_F - Y_D
+(X_E - X_F) * tan(theta_3) = (2 + tan(theta_3)*tan(theta_3))*(Y_F-H_s)
