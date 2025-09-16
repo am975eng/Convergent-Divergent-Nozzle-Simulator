@@ -310,7 +310,7 @@ class MyWindow(QMainWindow):
         
         def calc_isen_press(M,P):
             """
-            Uses isentropic relation to calculate pressure at a point using stagnation conditions.
+            Uses isentropic relation to calculate pressure at a point given Mach number at the point and using stagnation conditions.
             
             Args:
                 M - Mach number at point of interest
@@ -318,6 +318,31 @@ class MyWindow(QMainWindow):
             """
             return P / (((1+ ((self.k-1)/2) * M * M))**(self.k/(self.k-1)))
 
+        def Prandtl_Meyer(M):
+            """
+            Function to calculate Prandtl-Meyer angle.
+            
+            Args:
+                M - Mach number at point of interest
+            """
+            term_1 = ((self.k+1)/(self.k-1))**0.5
+            term_2 = (((self.k-1)/(self.k+1))*(M**2-1))**0.5
+            term_3 = (M**2-1)**0.5
+            print(M)
+            print((0**2 - 1)**0.5)
+            print(term_3)
+            nu = term_1 * np.arctan(term_2) - np.arctan(term_3)
+            return nu
+        
+        def Mach_Press_Isen_Nonstag(M_2, M_1, P_2, P_1):
+            """
+            Function used to relate pressures and Mach numbers isentropically for non-stagnation conditions.
+            """
+            exp = self.k/(self.k-1)
+            term_1 = 1 + ((self.k-1)/2)*M_1*M_1
+            term_2 = 1 + ((self.k-1)/2)*M_2*M_2
+            eqn = -(P_2/P_1) + ((term_1/term_2)**exp)
+            return eqn
         # Solve for supersonic and subsonic exit conditions
         try:
             M_e_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_outlet,A_star)).root
@@ -459,6 +484,7 @@ class MyWindow(QMainWindow):
             else:
                 # Underexpanded nozzle
                 self.result_display_label.setText('Underexpanded supersonic exhaust')
+                
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
@@ -469,6 +495,12 @@ class MyWindow(QMainWindow):
                     self.M_array[shift] = M_x_sup
                     self.T_array[shift] = T_x
 
+                nu_1 = Prandtl_Meyer(self.M_array[-1])
+                M_2 = root_scalar(Mach_Press_Isen_Nonstag, bracket=[1,100], args=(self.M_array[-1],P_amb+.1,self.P_array[-1])).root
+                nu_2 = Prandtl_Meyer(M_2)
+                mu_1 = np.arcsin(1/self.M_array[-1])
+                mu_2 = np.arcsin(1/M_2)
+                print(f"Nu_1: {nu_1:.2f}, Nu_2: {nu_2:.2f}, Mu_1: {mu_1*180/np.pi:.2f}, Mu_2: {mu_2*180/np.pi:.2f}")
 
             self.P_e=self.P_array[-1]
             self.M_e=self.M_array[-1]
