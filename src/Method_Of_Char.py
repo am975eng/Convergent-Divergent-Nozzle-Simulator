@@ -1,7 +1,8 @@
-import math
 import numpy as np
 from scipy.optimize import root_scalar
 from matplotlib import pyplot as plt
+from scipy.interpolate import griddata
+
 """
 Script that solves for minimum length nozzle using method of characteristics 
 to generate mach waves or characteristics lines. 
@@ -9,11 +10,7 @@ to generate mach waves or characteristics lines.
 Initially the flow is turned by the wall angle through a Prandtl-Meyer expansion fan from a sonic throat. These mach lines form characteristic lines in which intersection points can be found. By matching characteristic strength we can generate new flow angles and prandtl-meyer angles. Marching along the nozzle the contour is plotted to ensure expansion waves are cancelled at the wall. At the end the flow angle is zero and isentropic straight exit flow is ensured. Contour data is then exported for use in the thruster simulator.
 """
 
-r_throat = .08
-r_inlet = .1
-r_outlet = .1
-
-def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7):
+def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
     def Prandtl_Meyer(M):
         """
         Calculate Prandtl-Meyer angle.
@@ -55,12 +52,16 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7):
     mu_n = np.zeros(npts)
     x_n = np.zeros(npts)
     y_n = np.zeros(npts)
+    x_contour = []
+    y_contour = []
 
     theta_n[0] = theta_wall_max 
     start = 1
     r_throat = 1
     y_n[0] = r_throat
     x_n[0] = 0
+    x_contour.append(x_n[0])
+    y_contour.append(y_n[0])
 
     for size in range(div, 0, -1):  # The number of intersecting interior points decreases by 1 with each iteration
         end = start + size - 1
@@ -68,8 +69,8 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7):
             for i in range(start,end+1):
                 theta_n[i] = delta_theta + (3*np.pi/180) * (i-1) 
                 nu_n[i] = theta_n[i]
-                K_minus[i] = theta_n[i] + nu_n[i]       # Char line strength constant
-                K_plus[i] = theta_n[i] - nu_n[i]
+                K_minus[i] = theta_n[i] + nu_n[i]       # Char line right running strength constant
+                K_plus[i] = theta_n[i] - nu_n[i]        # Char line left running
                 M_n[i] = root_scalar(RS_M_from_nu, bracket=[1,10], args=(nu_n[i])).root # Local Mach number
                 mu_n[i] = np.arcsin(1/M_n[i])
                 if i == 1:
@@ -111,7 +112,9 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7):
             y_3 = y_1 + m_1*(x_3 - x_1)
             x_n[i+1]=x_3
             y_n[i+1]=y_3
-            plt.plot([x_1, x_3], [y_1, y_3], 'k-', linewidth=2)
+            x_contour.append(x_3)
+            y_contour.append(y_3)
+            plt.plot([x_1, x_3], [y_1, y_3], 'r-', linewidth=2)
             plt.plot([x_2, x_3], [y_2, y_3], 'k-', linewidth=2)
             plt.annotate(str(i+1), (x_3,y_3))
 
@@ -177,8 +180,10 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7):
             y_3 = y_1 + m_1*(x_3 - x_1)
             x_n[i+1]=x_3
             y_n[i+1]=y_3
+            x_contour.append(x_3)
+            y_contour.append(y_3)
 
-            plt.plot([x_1, x_3], [y_1, y_3], 'k-', linewidth=2)
+            plt.plot([x_1, x_3], [y_1, y_3], 'r-', linewidth=2)
             plt.plot([x_2, x_3], [y_2, y_3], 'k-', linewidth=2)
             plt.annotate(str(i+1), (x_3,y_3))                    
 
@@ -191,10 +196,33 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7):
         
         start = end + 2  # move past block + skip 1
 
-    for i in range(len(theta_n)):
-        print(f"i {str(i)} K- {K_minus[i]*180/np.pi:.3f} K+ {K_plus[i]*180/np.pi:.3f} theta {theta_n[i]*180/np.pi:.3f} nu {nu_n[i]*180/np.pi:.3f} M {M_n[i]:.3f} mu {mu_n[i]*180/np.pi:.3f}")
+    if print_flag == True:
+        for i in range(len(theta_n)):
+            print(f"i {str(i)} K- {K_minus[i]*180/np.pi:.3f} K+ {K_plus[i]*180/np.pi:.3f} theta {theta_n[i]*180/np.pi:.3f} nu {nu_n[i]*180/np.pi:.3f} M {M_n[i]:.3f} mu {mu_n[i]*180/np.pi:.3f}")
+
+    return x_contour, y_contour, x_n, y_n, M_n
 
 if __name__ == "__main__":
-    gen_MOC_MLN(2.4,1,1.4,10)
+    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,1,1.4,7)
+    plt.axis('equal')
+    plt.title('Method of Characteristics - Minimum Length Nozzle')
+    plt.xlabel('X Position (m)')
+    plt.ylabel('Y Position (m)')
+
+    plt.figure()
+    x_n = np.append(x_n, max(x_n))
+    y_n = np.append(y_n, 0)
+    M_n = np.append(M_n, max(M_n))
+    x_i = np.linspace(min(x_n), max(x_n), 300)
+    y_i = np.linspace(min(y_n), max(y_n), 300)
+    X,Y = np.meshgrid(x_i,y_i)
+    Z = griddata((x_n, y_n), M_n, (X, Y), method='cubic')
+    c = plt.pcolormesh(X, Y, Z, cmap=plt.cm.RdYlBu )
+    plt.scatter(x_n, y_n, c=M_n, edgecolor="k", s=1)  # show original points
+    plt.plot(x_contour, y_contour, 'k-', linewidth=2)
+    plt.title('Mach Number Contour')
+    plt.xlabel('X Position (m)')
+    plt.ylabel('Y Position (m)')
+    plt.colorbar(c)
     plt.axis('equal')
     plt.show()
