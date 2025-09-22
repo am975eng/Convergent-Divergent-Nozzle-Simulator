@@ -2,45 +2,19 @@ import numpy as np
 from scipy.optimize import root_scalar
 from matplotlib import pyplot as plt
 from scipy.interpolate import griddata
-
+import Aero_Thermo as AT
 """
-Script that solves for minimum length nozzle using method of characteristics 
-to generate mach waves or characteristics lines. 
+Script that solves for minimum length nozzle using method of characteristics to generate mach waves or characteristics lines with a contour nozzle that absorbs expansion waves. 
 
-Initially the flow is turned by the wall angle through a Prandtl-Meyer expansion fan from a sonic throat. These mach lines form characteristic lines in which intersection points can be found. By matching characteristic strength we can generate new flow angles and prandtl-meyer angles. Marching along the nozzle the contour is plotted to ensure expansion waves are cancelled at the wall. At the end the flow angle is zero and isentropic straight exit flow is ensured. Contour data is then exported for use in the thruster simulator.
+We assume the flow leaves the nozzle smoothly at zero angle and calculate the properties of the exit Prandtl-Meyer shock as it originates from the throat. This gives us the wall angle at the throat and the first section of contour geometry. A fan of waves is generated from sonic throat conditions to theta_wall_max until it reaches the centerline at which point theta is zero or an intersection point.  Left and right running characteristic lines have constant strength theta - nu and theta + nu respectively which can be set equal to each other at intersection points to solve for flow properties. By marching through this network of points we can solve for all flow properties throughout the nozzle. To generate the wall contour we use the previous wall point and draw a line with angle 0.5(theta_k-1 + theta_k) as well as the left running characteristic line to find the intersection point.
 """
 
 def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
-    def Prandtl_Meyer(M):
-        """
-        Calculate Prandtl-Meyer angle.
-        
-        Args:
-            M - Mach number at point of interest
-        """
-        term_1 = ((k+1)/(k-1))**0.5
-        term_2 = (((k-1)/(k+1))*(M**2-1))**0.5
-        term_3 = (M**2-1)**0.5
-        nu = term_1 * np.arctan(term_2) - np.arctan(term_3)
-        return nu
-    
-    def RS_M_from_nu(M, nu):
-        """
-        Function called by root_scalar to calculate Mach number using Prandtl-Meyer relation.
-        
-        Args:
-            M - Mach number at point of interest
-            nu - Prandtl-Meyer angle"""
-        term_1 = ((k+1)/(k-1))**0.5
-        term_2 = (((k-1)/(k+1))*(M**2-1))**0.5
-        term_3 = (M**2-1)**0.5
-        eqn = -nu + term_1 * np.arctan(term_2) - np.arctan(term_3)
-        return eqn
-
-
-    theta_wall_max = Prandtl_Meyer(M_exit)/2    # Wall angle at throat
-    delta_theta = 0.375*np.pi/180               # PM Fan Increment
-    npts = int(div * (div+1)/2 + div)           # Total number of intersection points
+    """
+    Generates a minimum length nozzle using method of characteristics."""
+    theta_wall_max = AT.calc_prandtl_meyer(M_exit, k)/2     # Wall angle at throat
+    delta_theta = 0.375*np.pi/180                           # PM Fan Increment
+    npts = int(div * (div+1)/2 + div)                       # Total number of intersection points
     npts += 1
 
     # Preallocate arrays
@@ -71,7 +45,7 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
                 nu_n[i] = theta_n[i]
                 K_minus[i] = theta_n[i] + nu_n[i]       # Char line right running strength constant
                 K_plus[i] = theta_n[i] - nu_n[i]        # Char line left running
-                M_n[i] = root_scalar(RS_M_from_nu, bracket=[1,10], args=(nu_n[i])).root # Local Mach number
+                M_n[i] = root_scalar(AT.RS_mach_prandtl_meyer, bracket=[1,10], args=(nu_n[i], k)).root # Local Mach number
                 mu_n[i] = np.arcsin(1/M_n[i])
                 if i == 1:
                     m = np.tan(theta_n[i] - mu_n[i])
@@ -126,7 +100,7 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
                     theta_n[i] = 0
                     K_plus[i] = -K_minus[i]
                     nu_n[i] = 0.5*(K_minus[i] - K_plus[i])
-                    M_n[i] = root_scalar(RS_M_from_nu, bracket=[1,10], args=(nu_n[i])).root
+                    M_n[i] = root_scalar(AT.RS_mach_prandtl_meyer, bracket=[1,10], args=(nu_n[i], k)).root
                     mu_n[i] = np.arcsin(1/M_n[i])
                     
                     m_1 = np.tan(theta_n[i-size-1] - mu_n[i-size-1])            
@@ -143,7 +117,7 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
                     K_plus[i] = K_plus[i-1]
                     theta_n[i] = 0.5*(K_minus[i] + K_plus[i])
                     nu_n[i] = 0.5*(K_minus[i] - K_plus[i])
-                    M_n[i] = root_scalar(RS_M_from_nu, bracket=[1,10], args=(nu_n[i])).root
+                    M_n[i] = root_scalar(AT.RS_mach_prandtl_meyer, bracket=[1,10], args=(nu_n[i], k)).root
                     mu_n[i] = np.arcsin(1/M_n[i])
                     
                     m_1 = np.tan(theta_n[i-1] + mu_n[i-1])
