@@ -12,6 +12,7 @@ import math
 import matplotlib as mpl
 from scipy.optimize import root_scalar
 from scipy.optimize import fsolve
+import Aero_Thermo as AT
 
 class MplCanvas(FigureCanvas):
     """
@@ -27,7 +28,10 @@ class MplCanvas(FigureCanvas):
         self.axes_2 = self.fig.add_subplot(412)
         self.axes_3 = self.fig.add_subplot(413)
         self.axes_4 = self.fig.add_subplot(414)
-        self.axes.set_aspect("equal")
+        #self.axes.set_aspect("equal")
+        
+        self.axes.grid(True)
+        self.axes.title.set_color('white')
         
         all_axes = [self.axes, self.axes_2, self.axes_3, self.axes_4]
         for ax in all_axes:
@@ -84,7 +88,7 @@ class MyWindow(QMainWindow):
         self.prop_list.currentTextChanged.connect(self.update_result)
         pressure_label = QLabel("Chamber Pressure [Pa]")
         pressure_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.P_chamber = QLineEdit("599844")
+        self.P_chamber = QLineEdit("5000")
         self.P_chamber.textChanged.connect(self.update_result)
         temp_label = QLabel("Chamber Temperature [K]")
         temp_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -108,7 +112,7 @@ class MyWindow(QMainWindow):
         self.radius_inlet.textChanged.connect(self.update_result)        
         self.radius_throat_label = QLabel("Throat Radius [m]")
         self.radius_throat_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.radius_throat = QLineEdit("0.01")
+        self.radius_throat = QLineEdit("0.08")
         self.radius_throat.textChanged.connect(self.update_result)
         self.radius_exit_label = QLabel("Exit Radius [m]")
         self.radius_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -283,76 +287,18 @@ class MyWindow(QMainWindow):
         T_star = T_0 * (2/(self.k+1))
         P_star = P_0 * ((2/(self.k+1))**(self.k/(self.k-1)))
         self.M_throat = 1
-
         #self.m_dot = math.pi*(r_throat**2)*P_0*(((self.k/(self.R_spec*T_0)))**0.5)*((2/(self.k+1))**((self.k+1)/(2*(self.k-1))))
-
         
-        def Area_Mach_x_y(M_y, M_x, A_y, A_x):
-            """
-            Function called by root_scalar to calculate Mach number using isentropic area-Mach relation.
-            
-            Args:
-                M_y - Mach number at y point
-                M_x - Mach number at x point
-                A_y - Area at y point
-                A_x - Area at x point
-            """
-            expon = (self.k+1)/(self.k-1)
-            term_x = 1 + ((self.k-1)/2)*M_x*M_x
-            term_y = 1 + ((self.k-1)/2)*M_y*M_y
-            Area_Mach_x_y = (-A_y/A_x)+(M_x/M_y)*(((term_y/term_x)**expon)**0.5)
-            return Area_Mach_x_y
         
-        def calc_isen_press(M,P):
-            """
-            Calc isentropic relation to calculate pressure at a point given Mach number at the point and using stagnation conditions.
-            
-            Args:
-                M - Mach number at point of interest
-                P - Stagnation pressure
-            """
-            return P / (((1+ ((self.k-1)/2) * M * M))**(self.k/(self.k-1)))
-
-        def Prandtl_Meyer(M):
-            """
-            Calculate Prandtl-Meyer angle.
-            
-            Args:
-                M - Mach number at point of interest
-            """
-            term_1 = ((self.k+1)/(self.k-1))**0.5
-            term_2 = (((self.k-1)/(self.k+1))*(M**2-1))**0.5
-            term_3 = (M**2-1)**0.5
-            print(M)
-            print((0**2 - 1)**0.5)
-            print(term_3)
-            nu = term_1 * np.arctan(term_2) - np.arctan(term_3)
-            return nu
-        
-        def Mach_Press_Isen(M_2, M_1, P_2, P_1):
-            """
-            Function called by root_scalar to calculate Mach number using isentropic pressure-Mach relation.
-            
-            Args:
-                M_2 - Mach number to be calculated
-                M_1 - Mach number at point 1
-                P_2 - Pressure at point to be calculated
-                P_1 - Pressure at x point
-            """
-            exp = self.k/(self.k-1)
-            term_1 = 1 + ((self.k-1)/2)*M_1*M_1
-            term_2 = 1 + ((self.k-1)/2)*M_2*M_2
-            eqn = -(P_2/P_1) + ((term_1/term_2)**exp)
-            return eqn
         # Solve for supersonic and subsonic exit conditions
         try:
-            M_e_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_outlet,A_star)).root
-            M_e_sub = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star)).root
+            M_e_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_outlet,A_star,self.k)).root
+            M_e_sub = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star,self.k)).root
         except ValueError as e:
             print("Unable to solve for Mach numbers. Expand solver bracket to ensure solution exists.")
 
-        self.P_e_sup = calc_isen_press(M_e_sup,P_0)
-        self.P_e_sub = calc_isen_press(M_e_sub,P_0)
+        self.P_e_sup = AT.calc_isen_press(M_e_sup,P_0,self.k)
+        self.P_e_sub = AT.calc_isen_press(M_e_sub,P_0,self.k)
         self.P_e_sup_val.setText("{:.4g}".format(self.P_e_sup))
         self.P_e_sub_val.setText("{:.4g}".format(self.P_e_sub))
         
@@ -361,36 +307,36 @@ class MyWindow(QMainWindow):
             Iterates through the divergent section to determine if flow is supersonic or subsonic and iterates shock
             location until back and exit pressure match.
             """
-            # Solve for shock at exit of nozzle
             shock_flag = False  # Checks if shock was calculated
             self.x_shock = None # Shock location
+            
+            # Solve for shock at exit of nozzle
             A_x = math.pi*(y_div[-1]**2)
-            M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
-            P_x = calc_isen_press(M_x_sup,P_0)
-            T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
-            M_y = ((M_x_sup**2 + (2/(self.k-1)))/((2*self.k/(self.k-1))*M_x_sup*M_x_sup-1))**0.5
-            P_y = P_x*(((2*self.k/(self.k+1))*M_x_sup*M_x_sup) - (self.k-1)/(self.k+1))
-            P_0_y = calc_isen_press(M_y,P_y) 
+            M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_x,A_star,self.k)).root # Mach number before shock
+            P_x = AT.calc_isen_press(M_x_sup,P_0,self.k)
+            T_x = AT.calc_isen_temp(M_x_sup,T_0,self.k)
+            M_y,P_y = AT.calc_M_P_normal(M_x_sup,P_x,self.k)
+            P_0_y = AT.calc_isen_stag_press(M_y,P_y,self.k) 
             T_0_y = T_0
 
+            # New critical area using post shock conditions
             A_star_shock = A_x * M_y * (((2/(self.k+1))*(1+((self.k-1)/2)*M_y*M_y))**((-self.k-1)/(2*self.k-2)))
-            M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock)).root   
-            P_e_shock = calc_isen_press(M_y_e,P_0_y)
+            M_y_e = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock,self.k)).root   
+            P_e_shock = AT.calc_isen_press(M_y_e,P_0_y,self.k)
             self.P_e_shock_val.setText("{:.1f}".format(P_e_shock))
 
             # Solve for shock at onset of divergent section
             A_x = math.pi*(y_div[1]**2)
-            M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
-            P_x = calc_isen_press(M_x_sup,P_0)
-            T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
-            M_y = ((M_x_sup**2 + (2/(self.k-1)))/((2*self.k/(self.k-1))*M_x_sup*M_x_sup-1))**0.5
-            P_y = P_x*(((2*self.k/(self.k+1))*M_x_sup*M_x_sup) - (self.k-1)/(self.k+1))
-            P_0_y = calc_isen_press(M_y,P_y) 
+            M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_x,A_star,self.k)).root
+            P_x = AT.calc_isen_press(M_x_sup,P_0,self.k)
+            T_x = AT.calc_isen_temp(M_x_sup,T_0,self.k)
+            M_y,P_y = AT.calc_M_P_normal(M_x_sup,P_x,self.k)
+            P_0_y = AT.calc_isen_stag_press(M_y,P_y,self.k) 
             T_0_y = T_0
 
             A_star_shock = A_x * M_y * (((2/(self.k+1))*(1+((self.k-1)/2)*M_y*M_y))**((-self.k-1)/(2*self.k-2)))
-            M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock)).root   
-            P_star_shock = calc_isen_press(M_y_e,P_0_y)
+            M_y_e = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock,self.k)).root   
+            P_star_shock = AT.calc_isen_press(M_y_e,P_0_y,self.k)
             self.P_star_shock_val.setText("{:.1f}".format(P_star_shock))
 
             if abs(P_amb-self.P_e_sup)/self.P_e_sup < 0.1 or (P_amb < 50 and self.P_e_sup < 100):
@@ -399,9 +345,9 @@ class MyWindow(QMainWindow):
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
-                    M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
-                    P_x = calc_isen_press(M_x_sup,P_0)
-                    T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
+                    M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_x,A_star,self.k)).root
+                    P_x = AT.calc_isen_press(M_x_sup,P_0,self.k)
+                    T_x = AT.calc_isen_temp(M_x_sup,T_0,self.k)
                     self.P_array[shift] = P_x
                     self.M_array[shift] = M_x_sup
                     self.T_array[shift] = T_x
@@ -411,16 +357,16 @@ class MyWindow(QMainWindow):
             elif P_amb >= self.P_e_sub:
                 # Back pressure is too high for choked subsonic flow
                 self.result_display_label.setText("Back pressure too high for choked subsonic flow")
-                M_e_sub = root_scalar(Mach_Press_Isen, bracket=[0.0001,1], args=(0,P_amb,P_0)).root
-                self.M_throat = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_e_sub,A_star,A_outlet)).root
+                M_e_sub = root_scalar(AT.RS_Mach_Press_Isen, bracket=[0.0001,1], args=(0,P_amb,P_0,self.k)).root
+                self.M_throat = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(M_e_sub,A_star,A_outlet,self.k)).root
                 
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
 
-                    M_x = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(M_e_sub, A_x, A_outlet)).root
-                    P_x = calc_isen_press(M_x,P_0)
-                    T_x = T_0 * ((1+ ((self.k-1)/2)*M_x*M_x)**-1)
+                    M_x = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(M_e_sub, A_x, A_outlet,self.k)).root
+                    P_x = AT.calc_isen_press(M_x,P_0,self.k)
+                    T_x = AT.calc_isen_temp(M_x,T_0,self.k)
 
                     self.P_array[shift] = P_x
                     self.M_array[shift] = M_x
@@ -433,22 +379,21 @@ class MyWindow(QMainWindow):
                     shift = index + len(x_conv)
                     if not shock_flag:
                         # Pre shock wave prop
-                        M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
-                        P_x = calc_isen_press(M_x_sup,P_0)
-                        T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
+                        M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_x,A_star,self.k)).root
+                        P_x = AT.calc_isen_press(M_x_sup,P_0,self.k)
+                        T_x = AT.calc_isen_temp(M_x_sup,T_0,self.k)
                         self.P_array[shift] = P_x
                         self.M_array[shift] = M_x_sup
                         self.T_array[shift] = T_x
 
                         # Post shock wave prop
-                        M_y = ((M_x_sup**2 + (2/(self.k-1)))/((2*self.k/(self.k-1))*M_x_sup*M_x_sup-1))**0.5
-                        P_y = P_x*(((2*self.k/(self.k+1))*M_x_sup*M_x_sup) - (self.k-1)/(self.k+1))
-                        P_0_y = calc_isen_press(M_y,P_y) 
+                        M_y, P_y = AT.calc_M_P_normal(M_x_sup,P_x,self.k)
+                        P_0_y = AT.calc_isen_stag_press(M_y,P_y,self.k)
                         T_0_y = T_0
 
                         A_star_shock = A_x * M_y * (((2/(self.k+1))*(1+((self.k-1)/2)*M_y*M_y))**((-self.k-1)/(2*self.k-2)))
-                        M_y_e = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock)).root   
-                        P_y_e = calc_isen_press(M_y_e,P_0_y)
+                        M_y_e = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock,self.k)).root   
+                        P_y_e = AT.calc_isen_press(M_y_e,P_0_y,self.k)
                         T_y_e = T_0_y * ((1+ ((self.k-1)/2)*M_y_e*M_y_e)**-1)
 
                         if abs((P_y_e - P_amb)/P_y_e) < 0.1:
@@ -457,9 +402,9 @@ class MyWindow(QMainWindow):
                             self.x_shock = x_div[index]
                             self.result_display_label.setText(f'Normal shock generated in divergent section at {self.x_shock:.3f} m')
                     elif shock_flag:
-                        M_y_curr = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_x,A_star_shock)).root
-                        P_y_curr = calc_isen_press(M_y_curr, P_0_y)
-                        T_y_curr = T_0_y * ((1+ ((self.k-1)/2)*M_y_curr*M_y_curr)**-1)
+                        M_y_curr = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(self.M_throat,A_x,A_star_shock,self.k)).root
+                        P_y_curr = AT.calc_isen_press(M_y_curr, P_0_y,self.k)
+                        T_y_curr = AT.calc_isen_temp(M_y_curr, T_0_y,self.k)
                         self.P_array[shift] = P_y_curr
                         self.M_array[shift] = M_y_curr
                         self.T_array[shift] = T_y_curr
@@ -470,24 +415,17 @@ class MyWindow(QMainWindow):
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
-                    M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
-                    P_x = calc_isen_press(M_x_sup,P_0)
-                    T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
+                    M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_x,A_star,self.k)).root
+                    P_x = AT.calc_isen_press(M_x_sup,P_0,self.k)
+                    T_x = AT.calc_isen_temp(M_x_sup,T_0,self.k)
                     self.P_array[shift] = P_x
                     self.M_array[shift] = M_x_sup
                     self.T_array[shift] = T_x
 
-                def over_shock_eqn(vars, M_1, P_1, P_2):
-                    beta, theta = vars
-                    M_1_n = M_1 * np.sin(beta)
-                    eqn1 = -(P_2/P_1) + (2*self.k*M_1_n*M_1_n-self.k+1)/(self.k+1)
-                    eqn2 = -np.tan(theta) + (2*(1/np.tan(beta))*(M_1*M_1*np.sin(beta)*np.sin(beta)-1))/(M_1*M_1*(self.k+np.cos(2*beta))+2)
-                    return [eqn1, eqn2]
-                
-                beta, theta = fsolve(over_shock_eqn,[np.radians(45),np.radians(45)],args=(self.M_array[-1],self.P_array[-1],P_amb))
+                beta, theta = fsolve(AT.FS_oblique_angle,[np.radians(45),np.radians(45)],args=(self.M_array[-1],self.P_array[-1],P_amb,self.k))
                 x_over_shock_1 = x_div[-1]
                 y_over_shock_1 = y_div[-1]
-                hyp = y_over_shock_1 * 0.8
+                hyp = y_over_shock_1 * 0.6
                 x_over_shock_2 = x_over_shock_1 + hyp * np.cos(beta)
                 y_over_shock_2 = y_over_shock_1 - hyp * np.sin(beta)
                 self.canvas.axes.plot([x_over_shock_1,x_over_shock_2],[y_over_shock_1,y_over_shock_2], 'r-')
@@ -500,17 +438,17 @@ class MyWindow(QMainWindow):
                 for index in range(len(x_div)):
                     A_x = math.pi*(y_div[index]**2)
                     shift = index + len(x_conv)
-                    M_x_sup = root_scalar(Area_Mach_x_y, bracket=[1,100], args=(self.M_throat,A_x,A_star)).root
-                    P_x = calc_isen_press(M_x_sup,P_0)
-                    T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sup*M_x_sup)**-1)
+                    M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_x,A_star,self.k)).root
+                    P_x = AT.calc_isen_press(M_x_sup,P_0,self.k)
+                    T_x = AT.calc_isen_temp(M_x_sup,T_0,self.k)
                     self.P_array[shift] = P_x
                     self.M_array[shift] = M_x_sup
                     self.T_array[shift] = T_x
 
                 # Prandtl-Meyer Expansion Fan
-                nu_1 = Prandtl_Meyer(self.M_array[-1])
-                M_2 = root_scalar(Mach_Press_Isen, bracket=[1,100], args=(self.M_array[-1],P_amb+.1,self.P_array[-1])).root
-                nu_2 = Prandtl_Meyer(M_2)
+                nu_1 = AT.calc_prandtl_meyer(self.M_array[-1],self.k)
+                M_2 = root_scalar(AT.RS_Mach_Press_Isen, bracket=[1,100], args=(self.M_array[-1],P_amb+.1,self.P_array[-1],self.k)).root
+                nu_2 = AT.calc_prandtl_meyer(M_2,self.k)
                 mu_1 = np.arcsin(1/self.M_array[-1])
                 mu_2 = np.arcsin(1/M_2)
                 theta = nu_2 - nu_1
@@ -518,8 +456,8 @@ class MyWindow(QMainWindow):
                 # Plotting fan by sweeping from mu_1 to mu_2
                 x_under_shock_1 = x_div[-1]
                 y_under_shock_1 = y_div[-1]
-                hyp = y_under_shock_1 * .8
-                theta_nu_2 = mu_2 - theta
+                hyp = y_under_shock_1 * .6
+                theta_nu_2 = theta - mu_2
                 theta_range = np.linspace(mu_1, theta_nu_2,3)
                 for i in range(len(theta_range)):
                     x_under_shock_2 = x_under_shock_1 + np.cos(theta_range[i]) * hyp
@@ -539,8 +477,8 @@ class MyWindow(QMainWindow):
         # Convergent section
         for index in range(len(x_conv)):
             A_x = math.pi*(y_conv[index]**2)
-            M_x_sub = root_scalar(Area_Mach_x_y, bracket=[0.0001,1], args=(self.M_throat,A_x,A_star)).root
-            P_x = calc_isen_press(M_x_sub,P_0)
+            M_x_sub = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(self.M_throat,A_x,A_star,self.k)).root
+            P_x = AT.calc_isen_press(M_x_sub,P_0,self.k)
             T_x = T_0 * ((1+ ((self.k-1)/2)*M_x_sub*M_x_sub)**-1)
 
             self.P_array[index] = P_x
@@ -557,9 +495,7 @@ class MyWindow(QMainWindow):
         self.canvas.axes.plot(x_conv, y_conv, 'b-', linewidth=2)
         self.canvas.axes.plot(x_div, y_div, 'b-', linewidth=2)   
         reflect_plot()
-        self.canvas.axes.grid(True)
-        self.canvas.axes.title.set_color('white')
-
+        
         def gen_cmap_plot(x,y,ax):
             points = np.array([x, y]).T.reshape(-1, 1, 2)
             segments = np.concatenate([points[:-1], points[1:]], axis=1)

@@ -130,6 +130,14 @@ def calc_isen_temp(M,T_0,k):
     return T_0 * ((1+ ((k-1)/2)*M*M)**-1)
 
 def calc_M_P_normal(M_1, P_1, k):
-    M_2 = ((M_1**2 + (2/(k-1)))/((2*k/(k-1))*M_1*M_1-1))**0.5                    # Mach number after shock
-    P_2 = P_1*(((2*k/(k+1))*M_1*M_1) - (k-1)/(k+1))
+    """
+    Calculate Mach number and static pressure after a normal shock
+    
+    Args:
+        M_1 - Mach number before shockwave
+        P_1 - Pressure before shockwave
+        k - Ratio of specific heats
+    """
+    M_2 = ((M_1**2 + (2/(k-1)))/((2*k/(k-1))*M_1*M_1-1))**0.5                    
+    P_2 = P_1*(((2*k/(k+1))*M_1*M_1) - (k-1)/(k+1))                               
     return M_2, P_2
