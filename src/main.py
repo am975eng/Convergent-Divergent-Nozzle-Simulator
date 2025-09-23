@@ -13,6 +13,7 @@ import matplotlib as mpl
 from scipy.optimize import root_scalar
 from scipy.optimize import fsolve
 import Aero_Thermo as AT
+import Method_Of_Char as MOC
 
 class MplCanvas(FigureCanvas):
     """
@@ -86,6 +87,11 @@ class MyWindow(QMainWindow):
         self.prop_list = QComboBox()
         self.prop_list.addItems(["Air", "CO2", "N2", "Xe"])
         self.prop_list.currentTextChanged.connect(self.update_result)
+        noz_label = QLabel("Nozzle Geometry Type")
+        noz_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.noz_type_list = QComboBox()
+        self.noz_type_list.addItems(["MOC Minimum Length Nozzle", "Conical"])
+        self.noz_type_list.currentTextChanged.connect(self.update_result)
         pressure_label = QLabel("Chamber Pressure [Pa]")
         pressure_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.P_chamber = QLineEdit("5000")
@@ -119,6 +125,7 @@ class MyWindow(QMainWindow):
         self.radius_exit = QLineEdit("0.1")
         self.radius_exit.textChanged.connect(self.update_result)
         thrust_design_label = QLabel("Design Thrust [N]")
+        thrust_design_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.thrust_design = QLineEdit("0")
         self.thrust_design.textChanged.connect(self.update_result)
 
@@ -156,14 +163,16 @@ class MyWindow(QMainWindow):
         option_layout.addWidget(DC_label, 0, 0)
         option_layout.addWidget(prop_label, 1, 0)
         option_layout.addWidget(self.prop_list, 2, 0)
-        option_layout.addWidget(pressure_label, 3, 0)
-        option_layout.addWidget(self.P_chamber, 4, 0)
-        option_layout.addWidget(temp_label, 5, 0)
-        option_layout.addWidget(self.T_chamber, 6, 0)
-        option_layout.addWidget(converg_label, 7, 0)
-        option_layout.addWidget(self.converg_ang, 8, 0)
-        option_layout.addWidget(diverg_label, 9, 0)
-        option_layout.addWidget(self.diverg_angle, 10, 0)
+        option_layout.addWidget(noz_label, 3, 0)
+        option_layout.addWidget(self.noz_type_list, 4, 0)
+        option_layout.addWidget(pressure_label, 5, 0)
+        option_layout.addWidget(self.P_chamber, 6, 0)
+        option_layout.addWidget(temp_label, 7, 0)
+        option_layout.addWidget(self.T_chamber, 8, 0)
+        option_layout.addWidget(converg_label, 9, 0)
+        option_layout.addWidget(self.converg_ang, 10, 0)
+        option_layout.addWidget(diverg_label, 11, 0)
+        option_layout.addWidget(self.diverg_angle, 12, 0)
 
         option_layout.addWidget(radius_inlet_label, 1, 1)        
         option_layout.addWidget(self.radius_inlet, 2, 1)
@@ -185,22 +194,22 @@ class MyWindow(QMainWindow):
         QSizePolicy.Policy.Expanding, # horizontal policy (absorbs all extra horizontal space)
         QSizePolicy.Policy.Minimum    # vertical policy (doesn’t expand sideways)
         )
-        option_layout.addItem(v_spacer, 11, 0, 1, 2)
+        option_layout.addItem(v_spacer, 13, 0, 1, 2)
         
-        option_layout.addWidget(results_label, 12, 0)
-        option_layout.addWidget(self.result_display_label, 13, 0, 1, 2)
-        option_layout.addWidget(P_e_sup_label, 14, 0)
-        option_layout.addWidget(self.P_e_sup_val, 15, 0)
-        option_layout.addWidget(P_e_sub_label, 14, 1)
-        option_layout.addWidget(self.P_e_sub_val, 15, 1)
-        option_layout.addWidget(P_e_shock_label, 16, 0)
-        option_layout.addWidget(self.P_e_shock_val, 17, 0)
-        option_layout.addWidget(P_star_shock_label, 16, 1)
-        option_layout.addWidget(self.P_star_shock_val, 17, 1)
-        option_layout.addWidget(m_dot_label, 18, 0)
-        option_layout.addWidget(self.m_dot_val, 19, 0)
-        option_layout.addWidget(thrust_label, 18, 1)
-        option_layout.addWidget(self.thrust_val, 19, 1)
+        option_layout.addWidget(results_label, 14, 0)
+        option_layout.addWidget(self.result_display_label, 15, 0, 1, 2)
+        option_layout.addWidget(P_e_sup_label, 16, 0)
+        option_layout.addWidget(self.P_e_sup_val, 17, 0)
+        option_layout.addWidget(P_e_sub_label, 16, 1)
+        option_layout.addWidget(self.P_e_sub_val, 17, 1)
+        option_layout.addWidget(P_e_shock_label, 18, 0)
+        option_layout.addWidget(self.P_e_shock_val, 19, 0)
+        option_layout.addWidget(P_star_shock_label, 18, 1)
+        option_layout.addWidget(self.P_star_shock_val, 19, 1)
+        option_layout.addWidget(m_dot_label, 20, 0)
+        option_layout.addWidget(self.m_dot_val, 21, 0)
+        option_layout.addWidget(thrust_label, 20, 1)
+        option_layout.addWidget(self.thrust_val, 21, 1)
 
         graphic_layout = QVBoxLayout()
         self.canvas = MplCanvas(self)
@@ -234,6 +243,22 @@ class MyWindow(QMainWindow):
                     color=line.get_color(), 
                     linestyle=line.get_linestyle(),
                     linewidth=line.get_linewidth())  # Slightly transparent
+        
+        def interp_array(arr, new_len):
+            """
+            Interpolates an array to a new length by filling in the missing values.
+
+            Args:
+                arr (numpy.ndarray): The array to be interpolated.
+                new_len (int): The desired length of the interpolated array.
+
+            Returns:
+                numpy.ndarray: The interpolated array.
+            """
+            x_old = np.linspace(0, 1, len(arr))
+            x_new = np.linspace(0, 1, new_len)
+            return np.interp(x_new, x_old, arr)
+        
 
         # Clear plots
         self.canvas.axes.clear()            
@@ -254,29 +279,7 @@ class MyWindow(QMainWindow):
         elif self.prop_list.currentText() == "Xe":
             self.R_spec = 63.33
             self.k=1.667
-
-        # Geometry
-        r_throat = float(self.radius_throat.text())
-        r_inlet = float(self.radius_inlet.text())
-        r_outlet = float(self.radius_exit.text())
-        A_star = math.pi*(r_throat**2)
-        A_inlet = math.pi*(r_inlet**2)
-        A_outlet = math.pi*(r_outlet**2)
-
-        converg_angle= np.deg2rad(float(self.converg_ang.text()))
-        diverg_angle = np.deg2rad(float(self.diverg_angle.text()))
-        converg_length = (r_inlet-r_throat)/np.tan(converg_angle)
-        diverg_length = (r_outlet-r_throat)/np.tan(diverg_angle)
-
-        res = 150
-        x_conv = -np.flip(np.linspace(0, converg_length, res))
-        y_conv = r_throat -x_conv*np.tan(converg_angle)
-        x_div = np.linspace(0, diverg_length, res)
-        y_div = r_throat + x_div*np.tan(diverg_angle)
-        self.P_array = np.zeros(len(x_conv)+len(x_div))
-        self.M_array = np.zeros(len(x_conv)+len(x_div))
-        self.T_array = np.zeros(len(x_conv)+len(x_div))
-            
+        
         # Extract thermo. properties
         T_0 = float(self.T_chamber.text())
         P_0 = float(self.P_chamber.text())
@@ -288,15 +291,43 @@ class MyWindow(QMainWindow):
         P_star = P_0 * ((2/(self.k+1))**(self.k/(self.k-1)))
         self.M_throat = 1
         #self.m_dot = math.pi*(r_throat**2)*P_0*(((self.k/(self.R_spec*T_0)))**0.5)*((2/(self.k+1))**((self.k+1)/(2*(self.k-1))))
-        
-        
-        # Solve for supersonic and subsonic exit conditions
+
+        # Geometry
+        r_throat = float(self.radius_throat.text())
+        r_inlet = float(self.radius_inlet.text())
+        r_outlet = float(self.radius_exit.text())
+        A_star = math.pi*(r_throat**2)
+        A_inlet = math.pi*(r_inlet**2)
+        A_outlet = math.pi*(r_outlet**2)
+        converg_angle= np.deg2rad(float(self.converg_ang.text()))
+        diverg_angle = np.deg2rad(float(self.diverg_angle.text()))
+        converg_length = (r_inlet-r_throat)/np.tan(converg_angle)
+        diverg_length = (r_outlet-r_throat)/np.tan(diverg_angle)
+
         try:
             M_e_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_outlet,A_star,self.k)).root
             M_e_sub = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star,self.k)).root
         except ValueError as e:
             print("Unable to solve for Mach numbers. Expand solver bracket to ensure solution exists.")
-
+        
+        res = 150
+        x_conv = -np.flip(np.linspace(0, converg_length, res))
+        y_conv = r_throat -x_conv*np.tan(converg_angle)
+        if self.noz_type_list.currentIndex() == 0:
+            x_div, y_div, *_ = MOC.gen_MOC_MLN(M_e_sup, r_throat, k=self.k, div=7)
+            x_div = interp_array(x_div, res)
+            y_div = interp_array(y_div, res)
+            r_outlet = np.max(y_div)
+            A_outlet = math.pi*(r_outlet**2)
+        elif self.noz_type_list.currentIndex() == 1: 
+            x_div = np.linspace(0, diverg_length, res)
+            y_div = r_throat + x_div*np.tan(diverg_angle)
+        
+        # Preallocation
+        self.P_array = np.zeros(len(x_conv)+len(x_div))
+        self.M_array = np.zeros(len(x_conv)+len(x_div))
+        self.T_array = np.zeros(len(x_conv)+len(x_div))
+        
         self.P_e_sup = AT.calc_isen_press(M_e_sup,P_0,self.k)
         self.P_e_sub = AT.calc_isen_press(M_e_sub,P_0,self.k)
         self.P_e_sup_val.setText("{:.4g}".format(self.P_e_sup))
@@ -309,7 +340,7 @@ class MyWindow(QMainWindow):
             """
             shock_flag = False  # Checks if shock was calculated
             self.x_shock = None # Shock location
-            
+
             # Solve for shock at exit of nozzle
             A_x = math.pi*(y_div[-1]**2)
             M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100], args=(self.M_throat,A_x,A_star,self.k)).root # Mach number before shock
@@ -321,7 +352,7 @@ class MyWindow(QMainWindow):
 
             # New critical area using post shock conditions
             A_star_shock = A_x * M_y * (((2/(self.k+1))*(1+((self.k-1)/2)*M_y*M_y))**((-self.k-1)/(2*self.k-2)))
-            M_y_e = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1], args=(self.M_throat,A_outlet,A_star_shock,self.k)).root   
+            M_y_e = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.00001,1], args=(self.M_throat,A_outlet,A_star_shock,self.k)).root   
             P_e_shock = AT.calc_isen_press(M_y_e,P_0_y,self.k)
             self.P_e_shock_val.setText("{:.1f}".format(P_e_shock))
 

@@ -9,11 +9,24 @@ Script that solves for minimum length nozzle using method of characteristics to 
 We assume the flow leaves the nozzle smoothly at zero angle and calculate the properties of the exit Prandtl-Meyer shock as it originates from the throat. This gives us the wall angle at the throat and the first section of contour geometry. A fan of waves is generated from sonic throat conditions to theta_wall_max until it reaches the centerline at which point theta is zero or an intersection point.  Left and right running characteristic lines have constant strength theta - nu and theta + nu respectively which can be set equal to each other at intersection points to solve for flow properties. By marching through this network of points we can solve for all flow properties throughout the nozzle. To generate the wall contour we use the previous wall point and draw a line with angle 0.5(theta_k-1 + theta_k) as well as the left running characteristic line to find the intersection point.
 """
 
-def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
+def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False, plot_flag=False):
     """
-    Generates a minimum length nozzle using method of characteristics."""
+    Generates a minimum length nozzle using method of characteristics.
+
+    Args:
+        M_exit (float): Exit Mach number.
+        r_throat (float): Throat radius.
+        k (float, optional): Ratio of specific heats. Defaults to 1.4.
+        div (int, optional): Number of divisions. Defaults to 7.
+        print_flag (bool, optional): Print MOC results in a table. Defaults to False.
+        plot_flag (bool, optional): Plot MOC results. Defaults to False.
+
+    Returns:
+        x_contour (list): Contour x coordinates.
+        y_contour (list): Contour y coordinates.
+        M_n (numpy.ndarray): Mach numbers."""
     theta_wall_max = AT.calc_prandtl_meyer(M_exit, k)/2     # Wall angle at throat
-    delta_theta = 0.375*np.pi/180                           # PM Fan Increment
+    init_theta = 0.375*np.pi/180                           # PM Fan Increment
     npts = int(div * (div+1)/2 + div)                       # Total number of intersection points
     npts += 1
 
@@ -30,8 +43,8 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
     y_contour = []
 
     theta_n[0] = theta_wall_max 
+    delta_theta = (theta_wall_max - init_theta)/(div-1)
     start = 1
-    r_throat = 1
     y_n[0] = r_throat
     x_n[0] = 0
     x_contour.append(x_n[0])
@@ -41,7 +54,7 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
         end = start + size - 1
         if start == 1:              # Prandtl-Meyer expansion fan
             for i in range(start,end+1):
-                theta_n[i] = delta_theta + (3*np.pi/180) * (i-1) 
+                theta_n[i] = init_theta + delta_theta * (i-1) 
                 nu_n[i] = theta_n[i]
                 K_minus[i] = theta_n[i] + nu_n[i]       # Char line right running strength constant
                 K_plus[i] = theta_n[i] - nu_n[i]        # Char line left running
@@ -51,8 +64,9 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
                     m = np.tan(theta_n[i] - mu_n[i])
                     x_n[i] = -y_n[0] / m
                     y_n[i] = 0
-                    plt.plot([0, x_n[i]], [y_n[0], y_n[i]], 'k-', linewidth=2)
-                    plt.annotate(str(i), (x_n[i],y_n[i]))
+                    if plot_flag:
+                        plt.plot([0, x_n[i]], [y_n[0], y_n[i]], 'k-', linewidth=2)
+                        plt.annotate(str(i), (x_n[i],y_n[i]))
                 else:
                     m_1=np.tan(theta_n[i] - mu_n[i])
                     x_1=x_n[0]
@@ -64,9 +78,10 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
                     y_3 = y_1 + m_1*(x_3 - x_1)
                     x_n[i] = x_3
                     y_n[i] = y_3
-                    plt.plot([x_n[0], x_n[i]], [y_n[0], y_n[i]], 'k-', linewidth=2)
-                    plt.plot([x_n[i-1], x_n[i]], [y_n[i-1], y_n[i]], 'k-', linewidth=2)
-                    plt.annotate(str(i), (x_n[i],y_n[i]))
+                    if plot_flag:
+                        plt.plot([x_n[0], x_n[i]], [y_n[0], y_n[i]], 'k-', linewidth=2)
+                        plt.plot([x_n[i-1], x_n[i]], [y_n[i-1], y_n[i]], 'k-', linewidth=2)
+                        plt.annotate(str(i), (x_n[i],y_n[i]))
                 
             theta_n[i+1] = theta_n[i]
             nu_n[i+1] = nu_n[i]
@@ -88,9 +103,10 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
             y_n[i+1]=y_3
             x_contour.append(x_3)
             y_contour.append(y_3)
-            plt.plot([x_1, x_3], [y_1, y_3], 'r-', linewidth=2)
-            plt.plot([x_2, x_3], [y_2, y_3], 'k-', linewidth=2)
-            plt.annotate(str(i+1), (x_3,y_3))
+            if plot_flag:
+                plt.plot([x_1, x_3], [y_1, y_3], 'r-', linewidth=2)
+                plt.plot([x_2, x_3], [y_2, y_3], 'k-', linewidth=2)
+                plt.annotate(str(i+1), (x_3,y_3))
 
         else:
             for i in range(start,end+1):
@@ -109,8 +125,9 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
                     x_n[i] = x_1 -y_1 / m_1
                     y_n[i] = 0
                     
-                    plt.plot([x_1,x_n[i]], [y_1,y_n[i]], 'k-', linewidth=2)
-                    plt.annotate(str(i), (x_n[i],y_n[i]))
+                    if plot_flag:
+                        plt.plot([x_1,x_n[i]], [y_1,y_n[i]], 'k-', linewidth=2)
+                        plt.annotate(str(i), (x_n[i],y_n[i]))
                 else:
                     # Interior intersection grid point
                     K_minus[i] = K_minus[i-size-1]
@@ -131,9 +148,10 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
                     x_n[i] = x_3
                     y_n[i] = y_3
                     
-                    plt.plot([x_n[i-1], x_n[i]], [y_n[i-1], y_n[i]], 'k-', linewidth=2)
-                    plt.plot([x_n[i-size-1], x_n[i]], [y_n[i-size-1], y_n[i]], 'k-', linewidth=2)
-                    plt.annotate(str(i), (x_n[i],y_n[i]))
+                    if plot_flag:
+                        plt.plot([x_n[i-1], x_n[i]], [y_n[i-1], y_n[i]], 'k-', linewidth=2)
+                        plt.plot([x_n[i-size-1], x_n[i]], [y_n[i-size-1], y_n[i]], 'k-', linewidth=2)
+                        plt.annotate(str(i), (x_n[i],y_n[i]))
 
             # Wall Contour
             theta_n[i+1] = theta_n[i]
@@ -157,9 +175,10 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
             x_contour.append(x_3)
             y_contour.append(y_3)
 
-            plt.plot([x_1, x_3], [y_1, y_3], 'r-', linewidth=2)
-            plt.plot([x_2, x_3], [y_2, y_3], 'k-', linewidth=2)
-            plt.annotate(str(i+1), (x_3,y_3))                    
+            if plot_flag:
+                plt.plot([x_1, x_3], [y_1, y_3], 'r-', linewidth=2)
+                plt.plot([x_2, x_3], [y_2, y_3], 'k-', linewidth=2)
+                plt.annotate(str(i+1), (x_3,y_3))                    
 
         K_minus[end+1] = K_minus[end]
         K_plus[end+1] = K_plus[end]
@@ -177,7 +196,7 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False):
     return x_contour, y_contour, x_n, y_n, M_n
 
 if __name__ == "__main__":
-    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,1,1.4,7)
+    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,1,1.4,7, True, True)
     plt.axis('equal')
     plt.title('Method of Characteristics - Minimum Length Nozzle')
     plt.xlabel('X Position (m)')
