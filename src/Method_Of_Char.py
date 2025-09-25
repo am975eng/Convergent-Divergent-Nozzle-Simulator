@@ -65,7 +65,7 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False, plot_flag=Fals
                     x_n[i] = -y_n[0] / m
                     y_n[i] = 0
                     if plot_flag:
-                        plt.plot([0, x_n[i]], [y_n[0], y_n[i]], 'k-', linewidth=2)
+                        plt.plot([x_n[0], x_n[i]], [y_n[0], y_n[i]], 'k-', linewidth=2)
                         plt.annotate(str(i), (x_n[i],y_n[i]))
                 else:
                     m_1=np.tan(theta_n[i] - mu_n[i])
@@ -195,27 +195,86 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False, plot_flag=Fals
 
     return x_contour, y_contour, x_n, y_n, M_n
 
-if __name__ == "__main__":
-    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,1,1.4,7, True, True)
-    plt.axis('equal')
-    plt.title('Method of Characteristics - Minimum Length Nozzle')
-    plt.xlabel('X Position (m)')
-    plt.ylabel('Y Position (m)')
+def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7, print_flag=False, plot_flag=False):
+    """
+    Generates a divergent nozzle contour using method of characteristics with an expansion and straightening section.
+    """
+    
+    # Expansion Section based on circular arc
+    res = 150                                               # Number of points to use for each contour
+    theta_wall_max = AT.calc_prandtl_meyer(M_exit, k)/2     # Maximum wall angle
+    theta_final_expand = -(np.pi/2-theta_wall_max)          # Final angle of arc
+    theta_expand = np.linspace(-np.pi/2, theta_final_expand, res)   # Theta for circular arc
+    scale_factor = 200
+    r_expand = r_throat * scale_factor                      # Radius of arc
+    y_center = r_throat * (scale_factor+1)                  # Center of arc
+    x_expand = r_expand * np.cos(theta_expand) 
+    y_expand = y_center + r_expand * np.sin(theta_expand)
 
-    plt.figure()
-    x_n = np.append(x_n, max(x_n))
-    y_n = np.append(y_n, 0)
-    M_n = np.append(M_n, max(M_n))
-    x_i = np.linspace(min(x_n), max(x_n), 300)
-    y_i = np.linspace(min(y_n), max(y_n), 300)
-    X,Y = np.meshgrid(x_i,y_i)
-    Z = griddata((x_n, y_n), M_n, (X, Y), method='cubic')
-    c = plt.pcolormesh(X, Y, Z, cmap=plt.cm.RdYlBu )
-    plt.scatter(x_n, y_n, c=M_n, edgecolor="k", s=1)  # show original points
-    plt.plot(x_contour, y_contour, 'k-', linewidth=2)
-    plt.title('Mach Number Contour')
-    plt.xlabel('X Position (m)')
-    plt.ylabel('Y Position (m)')
-    plt.colorbar(c)
-    plt.axis('equal')
+    theta_expand = np.linspace(0,theta_wall_max, res)
+    x_expand = r_expand * np.sin(theta_expand)
+    y_expand = r_throat + r_expand * (1-np.cos(theta_expand))
+
+    start = 1
+    npts = int(div * (div+1)/2 + div)                       # Total number of intersection points
+    npts += 1
+    theta_n = np.zeros(npts)
+    theta_n[0:div+1] = np.linspace(0,theta_wall_max, div+1)
+    nu_n = np.zeros(npts)
+    M_n = np.zeros(npts)
+    mu_n = np.zeros(npts)
+    K_minus = np.zeros(npts)
+    K_plus = np.zeros(npts)
+    x_n = np.zeros(npts)
+    y_n = np.zeros(npts)
+
+    for size in range(div, 0, -1):  # The number of intersecting interior points decreases by 1 with each iteration
+        end = start + size - 1
+        if start == 1:              # Prandtl-Meyer expansion fan
+            for i in range(start,end+1):
+                nu_n[i] = theta_n[i]
+                K_minus[i] = theta_n[i] + nu_n[i]       # Char line right running strength constant
+                K_plus[i] = theta_n[i] - nu_n[i]        # Char line left running
+                M_n[i] = root_scalar(AT.RS_mach_prandtl_meyer, bracket=[1,10], args=(nu_n[i], k)).root 
+                mu_n[i] = AT.calc_prandtl_meyer(M_n[i], k)
+                
+                x_n[i] = r_expand * np.sin(theta_n[i])
+                y_n[i] = r_throat + r_expand * (1-np.cos(theta_n[i])) 
+                if plot_flag:
+                    plt.scatter(x_n[i], y_n[i], s=1)
+                    plt.annotate(str(i), (x_n[i],y_n[i]))
+                    
+    
+    for i in range(len(theta_n)):
+        print(f" i {i} theta_n {theta_n[i]*180/np.pi:.3f} nu_n {nu_n[i]*180/np.pi:.3f} K- {K_minus[i]*180/np.pi:.3f} K+ {K_plus[i]*180/np.pi:.3f} M_n {M_n[i]:.3f} mu_n {mu_n[i]*180/np.pi:.3f} x_n {x_n[i]:.3f} y_n {y_n[i]:.3f}")
     plt.show()
+    # plt.plot(x_expand, y_expand, 'k-')
+    # plt.axis('equal')
+    # plt.show()
+
+if __name__ == "__main__":
+    # x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,1,1.4,7, True, True)
+    # plt.axis('equal')
+    # plt.title('Method of Characteristics - Minimum Length Nozzle')
+    # plt.xlabel('X Position (m)')
+    # plt.ylabel('Y Position (m)')
+
+    # plt.figure()
+    # x_n = np.append(x_n, max(x_n))
+    # y_n = np.append(y_n, 0)
+    # M_n = np.append(M_n, max(M_n))
+    # x_i = np.linspace(min(x_n), max(x_n), 300)
+    # y_i = np.linspace(min(y_n), max(y_n), 300)
+    # X,Y = np.meshgrid(x_i,y_i)
+    # Z = griddata((x_n, y_n), M_n, (X, Y), method='cubic')
+    # c = plt.pcolormesh(X, Y, Z, cmap=plt.cm.RdYlBu )
+    # plt.scatter(x_n, y_n, c=M_n, edgecolor="k", s=1)  # show original points
+    # plt.plot(x_contour, y_contour, 'k-', linewidth=2)
+    # plt.title('Mach Number Contour')
+    # plt.xlabel('X Position (m)')
+    # plt.ylabel('Y Position (m)')
+    # plt.colorbar(c)
+    # plt.axis('equal')
+    # plt.show()
+
+    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(2.4,1,1.4,7, True, True)
