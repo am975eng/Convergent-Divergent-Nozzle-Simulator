@@ -90,7 +90,7 @@ class MyWindow(QMainWindow):
         noz_label = QLabel("Nozzle Geometry Type")
         noz_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.noz_type_list = QComboBox()
-        self.noz_type_list.addItems(["MOC Minimum Length Nozzle", "Conical"])
+        self.noz_type_list.addItems(["MOC Full Length Nozzle", "MOC Minimum Length Nozzle", "Conical"])
         self.noz_type_list.currentTextChanged.connect(self.update_result)
         pressure_label = QLabel("Chamber Pressure [Pa]")
         pressure_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -243,22 +243,6 @@ class MyWindow(QMainWindow):
                     color=line.get_color(), 
                     linestyle=line.get_linestyle(),
                     linewidth=line.get_linewidth())  # Slightly transparent
-        
-        def interp_array(arr, new_len):
-            """
-            Interpolates an array to a new length by filling in the missing values.
-
-            Args:
-                arr (numpy.ndarray): The array to be interpolated.
-                new_len (int): The desired length of the interpolated array.
-
-            Returns:
-                numpy.ndarray: The interpolated array.
-            """
-            x_old = np.linspace(0, 1, len(arr))
-            x_new = np.linspace(0, 1, new_len)
-            return np.interp(x_new, x_old, arr)
-        
 
         # Clear plots
         self.canvas.axes.clear()            
@@ -314,12 +298,14 @@ class MyWindow(QMainWindow):
         x_conv = -np.flip(np.linspace(0, converg_length, res))
         y_conv = r_throat -x_conv*np.tan(converg_angle)
         if self.noz_type_list.currentIndex() == 0:
-            x_div, y_div, *_ = MOC.gen_MOC_MLN(M_e_sup, r_throat, k=self.k, div=7)
-            x_div = interp_array(x_div, res)
-            y_div = interp_array(y_div, res)
+            x_div, y_div, *_ = MOC.gen_MOC_FLN(M_e_sup, r_throat, k=self.k, div=7)
             r_outlet = np.max(y_div)
             A_outlet = math.pi*(r_outlet**2)
-        elif self.noz_type_list.currentIndex() == 1: 
+        elif self.noz_type_list.currentIndex() == 1:
+            x_div, y_div, *_ = MOC.gen_MOC_MLN(M_e_sup, r_throat, k=self.k, div=7)
+            r_outlet = np.max(y_div)
+            A_outlet = math.pi*(r_outlet**2)
+        elif self.noz_type_list.currentIndex() == 2: 
             x_div = np.linspace(0, diverg_length, res)
             y_div = r_throat + x_div*np.tan(diverg_angle)
         
