@@ -25,29 +25,14 @@ similarily.
 
 import numpy as np
 from scipy.optimize import root_scalar
+from scipy.interpolate import griddata
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from scipy.interpolate import griddata
+
 import Aero_Thermo as AT
 
 
-def interp_array(arr, new_len):
-            """
-            Interpolates an array to a new length by filling in the missing 
-            values.
-
-            Args:
-                arr (numpy.ndarray): The array to be interpolated.
-                new_len (int): The desired length of the interpolated array.
-
-            Returns:
-                numpy.ndarray: The interpolated array.
-            """
-            x_old = np.linspace(0, 1, len(arr))
-            x_new = np.linspace(0, 1, new_len)
-            return np.interp(x_new, x_old, arr)
-
-def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False, 
+def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
                 plot_flag=False):
     """
     Generates a minimum length nozzle using method of characteristics.
@@ -91,7 +76,7 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
     x_n[0] = 0
     x_contour.append(x_n[0])
     y_contour.append(y_n[0])
-    
+
     if plot_flag:
         plt.figure()
         plt.axis('equal')
@@ -100,31 +85,31 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
         plt.ylabel('Y Position (m)')
         colors = ['red', 'yellow', 'green']
         n_colors = div  # Number of colors you want
-        custom_cmap = LinearSegmentedColormap.from_list('red_green', 
+        custom_cmap = LinearSegmentedColormap.from_list('red_green',
                                                         colors, N=n_colors)
 
-    idx = 1                                         # Current point index                     
+    idx = 1                                         # Current point index
     row = 1                                         # Vertical row index
     while idx <= npts-1:
         row_len = div - row + 2                     # Length of vertical row
         for row_index in range(row_len):            # Iterate through each row
             if row_index==0:                        # Centerline Point
                 if idx == 1:                        # First PM centerline point
-                    theta_n[idx] = init_theta + delta_theta * (idx-1) 
+                    theta_n[idx] = init_theta + delta_theta * (idx-1)
                     nu_n[idx] = theta_n[idx]        # PM angle
                     K_minus[idx] = theta_n[idx] + nu_n[idx] # Char line strength
-                    K_plus[idx] = theta_n[idx] - nu_n[idx]  # Left char line 
+                    K_plus[idx] = theta_n[idx] - nu_n[idx]  # Left char line
                     M_n[idx] = root_scalar(         # Local Mach number
-                        AT.RS_mach_prandtl_meyer, bracket=[1,10], 
-                        args=(nu_n[idx], k)).root 
+                        AT.RS_mach_prandtl_meyer, bracket=[1,10],
+                        args=(nu_n[idx], k)).root
                     mu_n[idx] = np.arcsin(1/M_n[idx])   # Char line angle
                     col[idx] = row_index
-                    
-                    m = np.tan(theta_n[idx] - mu_n[idx])    
+
+                    m = np.tan(theta_n[idx] - mu_n[idx])
                     x_n[idx] = -y_n[0] / m
                     y_n[idx] = 0
                     if plot_flag:
-                        plt.plot([x_n[0], x_n[idx]], [y_n[0], y_n[idx]], 
+                        plt.plot([x_n[0], x_n[idx]], [y_n[0], y_n[idx]],
                                  c=custom_cmap(int(col[idx])), linewidth=2)
                         plt.annotate(str(idx), (x_n[idx],y_n[idx]))
                 else:                               # Other centerline points
@@ -133,11 +118,11 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
                     K_plus[idx] = -K_minus[idx]
                     nu_n[idx] = 0.5*(K_minus[idx] - K_plus[idx])
                     M_n[idx] = root_scalar(
-                        AT.RS_mach_prandtl_meyer, bracket=[1,10], 
+                        AT.RS_mach_prandtl_meyer, bracket=[1,10],
                         args=(nu_n[idx], k)).root
                     mu_n[idx] = np.arcsin(1/M_n[idx])
                     col[idx] = col[idx-row_len]
-                    
+
                     m_1 = np.tan(
                         (theta_n[idx-row_len] - mu_n[idx-row_len] - mu_n[idx])
                         /2)
@@ -145,7 +130,7 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
                     y_1 = y_n[idx-row_len]
                     x_n[idx] = x_1 - y_1 / m_1
                     y_n[idx] = 0
-                    
+
                     if plot_flag:
                         plt.plot([x_1,x_n[idx]], [y_1,y_n[idx]],
                                  c=custom_cmap(int(col[idx])), linewidth=2)
@@ -175,21 +160,21 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
 
                 if plot_flag:
                     plt.plot([x_1, x_3], [y_1, y_3], 'k-', linewidth=2)
-                    plt.plot([x_2, x_3], [y_2, y_3], 
+                    plt.plot([x_2, x_3], [y_2, y_3],
                              c=custom_cmap(int(col[row])), linewidth=2)
                     plt.annotate(str(idx), (x_3,y_3))
             else:                               # Interior intersection points
                 if row == 1:                    # PM fan interior points
-                    theta_n[idx] = init_theta + delta_theta * (idx-1) 
+                    theta_n[idx] = init_theta + delta_theta * (idx-1)
                     nu_n[idx] = theta_n[idx]
                     K_minus[idx] = theta_n[idx] + nu_n[idx] # Right ch strength
                     K_plus[idx] = theta_n[idx] - nu_n[idx]  # Left char strength
                     M_n[idx] = root_scalar(AT.RS_mach_prandtl_meyer, # Mach
-                                           bracket=[1,10], 
-                                           args=(nu_n[idx], k)).root 
+                                           bracket=[1,10],
+                                           args=(nu_n[idx], k)).root
                     mu_n[idx] = np.arcsin(1/M_n[idx])
                     col[idx] = idx
-                
+
                     # Throat Point
                     m_1=np.tan(theta_n[idx] - mu_n[idx])
                     x_1=x_n[0]
@@ -206,23 +191,23 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
                     x_n[idx] = x_3
                     y_n[idx] = y_3
                     if plot_flag:
-                        plt.plot([x_n[0], x_n[idx]], [y_n[0], y_n[idx]], 
+                        plt.plot([x_n[0], x_n[idx]], [y_n[0], y_n[idx]],
                                  c=custom_cmap(int(col[idx])), linewidth=2)
-                        plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]], 
+                        plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]],
                                  c=custom_cmap(int(col[row])), linewidth=2)
                         plt.annotate(str(idx), (x_n[idx],y_n[idx]))
-                
+
                 else:                                   # Interior grid points
                     K_minus[idx] = K_minus[idx-row_len] # K minus from prev row
-                    K_plus[idx] = K_plus[idx-1]         # K plus from prev point 
+                    K_plus[idx] = K_plus[idx-1]         # K plus from prev point
                     theta_n[idx] = 0.5*(K_minus[idx] + K_plus[idx])
                     nu_n[idx] = 0.5*(K_minus[idx] - K_plus[idx])
-                    M_n[idx] = root_scalar(AT.RS_mach_prandtl_meyer, 
-                                           bracket=[1,10], 
+                    M_n[idx] = root_scalar(AT.RS_mach_prandtl_meyer,
+                                           bracket=[1,10],
                                            args=(nu_n[idx], k)).root
                     mu_n[idx] = np.arcsin(1/M_n[idx])
                     col[idx] = col[idx-row_len]
-                    
+
                     m_1 = np.tan(theta_n[idx-1] + mu_n[idx-1])
                     x_1 = x_n[idx-1]
                     y_1 = y_n[idx-1]
@@ -233,31 +218,28 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
                     y_3 = y_1 + m_1*(x_3 - x_1)
                     x_n[idx] = x_3
                     y_n[idx] = y_3
-                    
+
                     if plot_flag:
-                        plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]], 
+                        plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]],
                                  c=custom_cmap(int(col[row])), linewidth=2)
-                        plt.plot([x_n[idx-row_len], x_n[idx]], 
-                                 [y_n[idx-row_len], y_n[idx]], 
+                        plt.plot([x_n[idx-row_len], x_n[idx]],
+                                 [y_n[idx-row_len], y_n[idx]],
                                  c=custom_cmap(int(col[idx])), linewidth=2)
-                        plt.annotate(str(idx), (x_n[idx],y_n[idx]))                      
+                        plt.annotate(str(idx), (x_n[idx],y_n[idx]))
             idx +=1
         row += 1
 
-    if print_flag == True:
+    if print_flag:
         for i in range(len(theta_n)):
-            print(f"i {str(i)} K- {K_minus[i]*180/np.pi:.3f}" + 
-                  f"K+ {K_plus[i]*180/np.pi:.3f}" + 
-                  f"theta {theta_n[i]*180/np.pi:.3f}" + 
-                  f" nu {nu_n[i]*180/np.pi:.3f} M {M_n[i]:.3f}" + 
+            print(f"i {str(i)} K- {K_minus[i]*180/np.pi:.3f}" +
+                  f"K+ {K_plus[i]*180/np.pi:.3f}" +
+                  f"theta {theta_n[i]*180/np.pi:.3f}" +
+                  f" nu {nu_n[i]*180/np.pi:.3f} M {M_n[i]:.3f}" +
                   f"mu {mu_n[i]*180/np.pi:.3f} x {x_n[i]:.3f} y {y_n[i]:.3f}")
-    
-    x_contour = interp_array(x_contour,res)
-    y_contour = interp_array(y_contour,res)
 
     return x_contour, y_contour, x_n, y_n, M_n
 
-def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7, 
+def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
                 print_flag=False, plot_flag=False):
     """
     Generates a divergent nozzle contour using method of characteristics with an
@@ -278,11 +260,11 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
         y_n (np.array): Point y positions
         M_n (np.array): Point Mach numbers
     """
-    
+
     # Expansion Section based on circular arc
     res = 150                                               # No. contour points
     theta_wall_max = AT.calc_prandtl_meyer(M_exit, k)/2     # Maximum wall angle
-    scale_factor = 5
+    scale_factor = 1
     r_expand = r_throat * scale_factor                      # Radius of arc
     theta_expand = np.linspace(0,theta_wall_max, res)
     x_expand = r_expand * np.sin(theta_expand)
@@ -306,7 +288,7 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
     x_n[0] = 0
     y_n[0] = r_throat
     idx = 1                                         # Current point index
-    # List of row lengths                     
+    # List of row lengths
     grid_row_pts = [div, div+1] + [div-i for i in range(div-1)]
 
     if plot_flag:
@@ -317,24 +299,24 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
         plt.ylabel('Y Position (m)')
         colors = ['red', 'yellow', 'green']
         n_colors = div  # Number of colors you want
-        custom_cmap = LinearSegmentedColormap.from_list('red_green', colors, 
+        custom_cmap = LinearSegmentedColormap.from_list('red_green', colors,
                                                         N=n_colors)
 
     for row_num, row_len in enumerate(grid_row_pts):    # Loop row lengths
         for row_index in range(row_len):                # Loop each row
             if idx <= div:                              # Expansion section
                 nu_n[idx] = theta_n[idx]                # PM angle
-                K_minus[idx] = theta_n[idx] + nu_n[idx] # Char str right 
+                K_minus[idx] = theta_n[idx] + nu_n[idx] # Char str right
                 K_plus[idx] = theta_n[idx] - nu_n[idx]  # Char str left
                 M_n[idx] = root_scalar(AT.RS_mach_prandtl_meyer, # Mach No.
-                                       bracket=[1,10], args=(nu_n[idx], k)).root 
+                                       bracket=[1,10], args=(nu_n[idx], k)).root
                 mu_n[idx] = np.arcsin(1/M_n[idx])       # Shock angle
                 col[idx] = row_index                    # Color
-                
+
                 x_n[idx] = r_expand * np.sin(theta_n[idx])
                 y_n[idx] = r_throat + r_expand * (1-np.cos(theta_n[idx]))
                 if plot_flag:
-                    plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]], 
+                    plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]],
                              "k-", linewidth=1)
                     plt.scatter(x_n[idx], y_n[idx], s=1)
                     plt.annotate(str(idx), (x_n[idx],y_n[idx]))
@@ -349,8 +331,8 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
                 K_plus[idx] = -K_minus[idx]
                 theta_n[idx] = 0
                 nu_n[idx] = K_minus[idx]
-                M_n[idx] = root_scalar(AT.RS_mach_prandtl_meyer, bracket=[1,10], 
-                                       args=(nu_n[idx], k)).root 
+                M_n[idx] = root_scalar(AT.RS_mach_prandtl_meyer, bracket=[1,10],
+                                       args=(nu_n[idx], k)).root
                 mu_n[idx] = np.arcsin(1/M_n[idx])
                 col[idx] = col[idx-offset]
 
@@ -361,8 +343,8 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
                 y_n[idx] = 0
 
                 if plot_flag:
-                    plt.plot([x_n[idx-offset], x_n[idx]], 
-                             [y_n[idx-offset], y_n[idx]], 
+                    plt.plot([x_n[idx-offset], x_n[idx]],
+                             [y_n[idx-offset], y_n[idx]],
                              c=custom_cmap(int(col[idx])), linewidth=1)
                     plt.scatter(x_n[idx], y_n[idx], s=1)
                     plt.annotate(str(idx), (x_n[idx],y_n[idx]))
@@ -392,7 +374,7 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
                 if plot_flag:
                     plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]],
                              c=custom_cmap(int(col[row_num])), linewidth=1)
-                    plt.plot([x_n[idx-offset], x_n[idx]], 
+                    plt.plot([x_n[idx-offset], x_n[idx]],
                              [y_n[idx-offset], y_n[idx]], "k-", linewidth=1)
                     plt.scatter(x_n[idx], y_n[idx], s=1)
                     plt.annotate(str(idx), (x_n[idx],y_n[idx]))
@@ -423,10 +405,10 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
                 y_n[idx] = y_3
 
                 if plot_flag:
-                    plt.plot([x_n[idx-offset], x_n[idx]], 
-                             [y_n[idx-offset], y_n[idx]], 
+                    plt.plot([x_n[idx-offset], x_n[idx]],
+                             [y_n[idx-offset], y_n[idx]],
                              c=custom_cmap(int(col[idx])), linewidth=1)
-                    plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]], 
+                    plt.plot([x_n[idx-1], x_n[idx]], [y_n[idx-1], y_n[idx]],
                              c=custom_cmap(int(col[row_num])), linewidth=1)
                     plt.scatter(x_n[idx], y_n[idx], s=1)
                     plt.annotate(str(idx), (x_n[idx],y_n[idx]))
@@ -435,23 +417,21 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
 
     if print_flag:
         for i in range(len(theta_n)):
-            print(f" i {i} theta_n {theta_n[i]*180/np.pi:.3f}" + 
+            print(f" i {i} theta_n {theta_n[i]*180/np.pi:.3f}" +
                   f" nu_n {nu_n[i]*180/np.pi:.3f}" +
-                  f" K- {K_minus[i]*180/np.pi:.3f}" + 
+                  f" K- {K_minus[i]*180/np.pi:.3f}" +
                   f" K+ {K_plus[i]*180/np.pi:.3f}"+
-                  f" M_n {M_n[i]:.3f} mu_n {mu_n[i]*180/np.pi:.3f}" + 
+                  f" M_n {M_n[i]:.3f} mu_n {mu_n[i]*180/np.pi:.3f}" +
                   f" x_n {x_n[i]:.3f} y_n {y_n[i]:.3f} col {col[i]}")
 
-    x_str = interp_array(x_str, res)
-    y_str = interp_array(y_str, res)
     x_contour = np.concatenate((x_expand, x_str))
     y_contour = np.concatenate((y_expand, y_str))
 
-    return x_contour, y_contour, x_n, y_n, M_n    
+    return x_contour, y_contour, x_n, y_n, M_n
 
 if __name__ == "__main__":
     # Test script
-    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,1,1.4,7, True, True)
+    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,.5,1.4,7, True, True)
 
     # Interpolated color mesh based on Mach number
     plt.figure()
@@ -462,7 +442,7 @@ if __name__ == "__main__":
     y_i = np.linspace(min(y_n), max(y_n), 300)
     X,Y = np.meshgrid(x_i,y_i)
     Z = griddata((x_n, y_n), M_n, (X, Y), method='cubic')
-    c = plt.pcolormesh(X, Y, Z, cmap=plt.cm.RdYlBu )
+    c = plt.pcolormesh(X, Y, Z, cmap=plt.cm.RdYlBu)
     plt.scatter(x_n, y_n, c=M_n, edgecolor="k", s=1)  # show original points
     plt.plot(x_contour, y_contour, 'k-', linewidth=2)
     plt.title('Mach Number Contour')
@@ -471,5 +451,14 @@ if __name__ == "__main__":
     plt.colorbar(c)
     plt.axis('equal')
 
-    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(2.4,1,1.4,7, True, True)
+    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(3,.5,1.4,50, True, True)
+    plt.figure()
+    res=150
+    plt.scatter(x_contour[res:], y_contour[res:])
+    coefficients = np.polyfit(x_contour[res:], y_contour[res:], 3)
+    poly_func = np.poly1d(coefficients)
+    x_smooth = np.linspace(x_contour[res:].min(), x_contour[res:].max(), 100)
+    y_smooth = poly_func(x_smooth)
+    plt.scatter(x_contour, y_contour, color='red', label='Data points')
+    plt.plot(x_smooth, y_smooth, label='Polyfit (degree 3)')
     plt.show()
