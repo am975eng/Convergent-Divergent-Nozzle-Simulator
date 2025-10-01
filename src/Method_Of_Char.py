@@ -25,12 +25,18 @@ similarily.
 
 import numpy as np
 from scipy.optimize import root_scalar
+from scipy.optimize import curve_fit
 from scipy.interpolate import griddata
+from sklearn.metrics import r2_score
+
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
 import Aero_Thermo as AT
 
+
+def high_poly_law(x, a, b, c, d, e):
+    return a * (x**4) + b * (x**3) + c * (x**2) + d * x + e
 
 def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
                 plot_flag=False):
@@ -208,10 +214,12 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
                     mu_n[idx] = np.arcsin(1/M_n[idx])
                     col[idx] = col[idx-row_len]
 
-                    m_1 = np.tan(theta_n[idx-1] + mu_n[idx-1])
+                    m_1 = np.tan((theta_n[idx-1] + mu_n[idx-1] + theta_n[idx] +
+                                  mu_n[idx])/2)
                     x_1 = x_n[idx-1]
                     y_1 = y_n[idx-1]
-                    m_2 = np.tan(theta_n[idx-row_len]  - mu_n[idx-row_len] )
+                    m_2 = np.tan((theta_n[idx-row_len] - mu_n[idx-row_len] +
+                                  theta_n[idx] - mu_n[idx])/2)
                     x_2 = x_n[idx-row_len]
                     y_2 = y_n[idx-row_len]
                     x_3 = (m_1*x_1 - m_2*x_2 + y_2 - y_1)/(m_1-m_2)
@@ -236,8 +244,18 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
                   f"theta {theta_n[i]*180/np.pi:.3f}" +
                   f" nu {nu_n[i]*180/np.pi:.3f} M {M_n[i]:.3f}" +
                   f"mu {mu_n[i]*180/np.pi:.3f} x {x_n[i]:.3f} y {y_n[i]:.3f}")
+            
+    # Fit nonlinear regression to MOC contour
+    p0 = [1.0, 1.0, 1.0, 1.0, 1.0]
+    popt, pcov = curve_fit(high_poly_law, x_contour, y_contour, p0=p0,
+                           maxfev=10000)
+    a, b, c, d, e = popt
 
-    return x_contour, y_contour, x_n, y_n, M_n
+    # Generate contour using fitted coefficients
+    x_contour_fit = np.linspace(x_contour[0], x_contour[-1], res)
+    y_contour_fit = high_poly_law(x_contour_fit, a, b, c, d, e)
+
+    return x_contour_fit, y_contour_fit, x_n, y_n, M_n
 
 def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
                 print_flag=False, plot_flag=False):
@@ -393,10 +411,12 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
                 mu_n[idx] = np.arcsin(1/M_n[idx])
                 col[idx] = col[idx-offset]
 
-                m_1 = np.tan(theta_n[idx-1]+mu_n[idx-1])
+                m_1 = np.tan((theta_n[idx-1] + mu_n[idx-1] + theta_n[idx] +
+                              mu_n[idx])/2)
                 x_1 = x_n[idx-1]
                 y_1 = y_n[idx-1]
-                m_2 = np.tan(theta_n[idx-offset] - mu_n[idx-offset])
+                m_2 = np.tan((theta_n[idx-offset] - mu_n[idx-offset] +
+                              theta_n[idx] - mu_n[idx])/2)
                 x_2 = x_n[idx-offset]
                 y_2 = y_n[idx-offset]
                 x_3 = (m_1*x_1 - m_2*x_2 + y_2 - y_1)/(m_1-m_2)
@@ -424,15 +444,31 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
                   f" M_n {M_n[i]:.3f} mu_n {mu_n[i]*180/np.pi:.3f}" +
                   f" x_n {x_n[i]:.3f} y_n {y_n[i]:.3f} col {col[i]}")
 
-    x_contour = np.concatenate((x_expand, x_str))
-    y_contour = np.concatenate((y_expand, y_str))
+    x_str = np.array(x_str)
+    y_str = np.array(y_str)
+
+    # Fit nonlinear regression to MOC contour
+    p0 = [1.0, 1.0, 1.0, 1.0, 1.0]
+    popt, pcov = curve_fit(high_poly_law, x_str, y_str, p0=p0, maxfev=10000)
+    a, b, c, d, e = popt
+
+    # Generate contour using fitted coefficients
+    x_str_fit = np.linspace(x_str[0], x_str[-1], res)
+    y_str_fit = high_poly_law(x_str_fit, a, b, c, d, e)
+
+    # Fill in gap between expansion and straightening sections
+    x_gap = np.linspace(x_expand[-1], x_str[0], int(res/5))
+    y_gap = np.linspace(y_expand[-1], y_str[0], int(res/5))
+
+    x_contour = np.concatenate((x_expand,x_gap[1:-1],x_str_fit))
+    y_contour = np.concatenate((y_expand,y_gap[1:-1],y_str_fit))
 
     return x_contour, y_contour, x_n, y_n, M_n
 
 if __name__ == "__main__":
     # Test script
     x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,.5,1.4,7, True, True)
-
+  
     # Interpolated color mesh based on Mach number
     plt.figure()
     x_n = np.append(x_n, max(x_n))
@@ -451,14 +487,5 @@ if __name__ == "__main__":
     plt.colorbar(c)
     plt.axis('equal')
 
-    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(3,.5,1.4,50, True, True)
-    plt.figure()
-    res=150
-    plt.scatter(x_contour[res:], y_contour[res:])
-    coefficients = np.polyfit(x_contour[res:], y_contour[res:], 3)
-    poly_func = np.poly1d(coefficients)
-    x_smooth = np.linspace(x_contour[res:].min(), x_contour[res:].max(), 100)
-    y_smooth = poly_func(x_smooth)
-    plt.scatter(x_contour, y_contour, color='red', label='Data points')
-    plt.plot(x_smooth, y_smooth, label='Polyfit (degree 3)')
+    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(3,.5,1.4,30, True, True)
     plt.show()
