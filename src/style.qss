@@ -95,3 +95,7 @@ QCheckBox::indicator:checked {
 QComboBox {
     color: white;
 }
+
+QPushButton {
+    color: white;
+}

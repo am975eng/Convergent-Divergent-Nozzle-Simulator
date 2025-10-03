@@ -14,7 +14,8 @@ from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QSizePolicy)
+    QSizePolicy,
+    QPushButton)
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,)
 from matplotlib.figure import Figure
@@ -30,6 +31,41 @@ from scipy.optimize import (
 
 import Aero_Thermo as AT
 import Method_Of_Char as MOC
+
+class ADAM_Optimizer:
+    def __init__(self, learning_rate=0.01, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+        self.lr = learning_rate
+        self.beta_1 = beta_1
+        self.beta_2 = beta_2
+        self.epsilon = epsilon
+        self.m = 0  # Momentum
+        self.v = 0  # Adaptive learning rate
+        self.t = 0  # Timestep
+        
+    def update(self, gradient):
+        self.t += 1
+        
+        # Update biased first moment estimate
+        self.m = self.beta_1 * self.m + (1 - self.beta_1) * gradient
+        
+        # Update biased second raw moment estimate  
+        self.v = self.beta_2 * self.v + (1 - self.beta_2) * (gradient ** 2)
+        
+        # Compute bias-corrected first moment estimate
+        m_hat = self.m / (1 - self.beta_1 ** self.t)
+        
+        # Compute bias-corrected second raw moment estimate
+        v_hat = self.v / (1 - self.beta_2 ** self.t)
+        
+        # Update parameters
+        update = self.lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
+        
+        return update
+    
+    def reset(self):
+        self.m = 0
+        self.v = 0
+        self.t = 0
 
 class MplCanvas(FigureCanvas):
     """
@@ -78,7 +114,6 @@ class MyWindow(QMainWindow):
             # Get the directory where this script is located
             current_dir = Path(__file__).parent
             style_file = current_dir / "style.qss"
-            print(f"Loading styles from {style_file}")
 
             with open(style_file, "r") as f:
                 stylesheet = f.read()
@@ -108,46 +143,47 @@ class MyWindow(QMainWindow):
         self.noz_type_list.addItems(["MOC Full Length Nozzle",
                                      "MOC Minimum Length Nozzle", "Conical"])
         self.noz_type_list.currentTextChanged.connect(self.update_result)
-        pressure_label = QLabel("Chamber Pressure [Pa]")
-        pressure_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.P_chamber = QLineEdit("5000")
-        self.P_chamber.textChanged.connect(self.update_result)
-        temp_label = QLabel("Chamber Temperature [K]")
-        temp_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.T_chamber = QLineEdit("293.15")
-        self.T_chamber.textChanged.connect(self.update_result)
-        amb_press_label = QLabel("Ambient Pressure [Pa]")
-        amb_press_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        P_chamber_label = QLabel("Chamber Pressure [Pa]")
+        P_chamber_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.P_chamber_val = QLineEdit("5000")
+        self.P_chamber_val.textChanged.connect(self.update_result)
+        T_chamber_label = QLabel("Chamber Temperature [K]")
+        T_chamber_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.T_chamber_val = QLineEdit("293.15")
+        self.T_chamber_val.textChanged.connect(self.update_result)
+        P_amb_label = QLabel("Ambient Pressure [Pa]")
+        P_amb_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.P_amb_val = QLineEdit("0")
         self.P_amb_val.textChanged.connect(self.update_result)
         converg_label = QLabel("Convergence Angle [Deg]")
         converg_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.converg_ang = QLineEdit("45")
-        self.converg_ang.textChanged.connect(self.update_result)
+        self.converg_ang_val = QLineEdit("45")
+        self.converg_ang_val.textChanged.connect(self.update_result)
         diverg_label = QLabel("Divergence Angle [Deg]")
         diverg_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.diverg_angle = QLineEdit("15")
-        self.diverg_angle.textChanged.connect(self.update_result)
+        self.diverg_angle_val = QLineEdit("15")
+        self.diverg_angle_val.textChanged.connect(self.update_result)
+        self.optimize_button = QPushButton("Optimize Geometry")
+        self.optimize_button.clicked.connect(self.calc_opt_geom)
 
         radius_inlet_label = QLabel("Inlet Radius [m]")
         radius_inlet_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.radius_inlet = QLineEdit("0.1")
-        self.radius_inlet.textChanged.connect(self.update_result)
+        self.radius_inlet_val = QLineEdit("0.1")
+        self.radius_inlet_val.textChanged.connect(self.update_result)
         self.radius_throat_label = QLabel("Throat Radius [m]")
         self.radius_throat_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.radius_throat = QLineEdit("0.08")
-        self.radius_throat.textChanged.connect(self.update_result)
+        self.radius_throat_val = QLineEdit("0.08")
+        self.radius_throat_val.textChanged.connect(self.update_result)
         self.radius_exit_label = QLabel("Exit Radius [m]")
         self.radius_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.radius_exit = QLineEdit("0.1")
-        self.radius_exit.textChanged.connect(self.update_result)
+        self.radius_exit_val = QLineEdit("0.1")
+        self.radius_exit_val.textChanged.connect(self.update_result)
         M_exit_label = QLabel("Exit Mach Number")
         M_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.M_exit_val = QLineEdit("2.0")
         thrust_design_label = QLabel("Design Thrust [N]")
         thrust_design_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.thrust_design = QLineEdit("100")
-        self.thrust_design.textChanged.connect(self.update_result)
+        self.thrust_design_val = QLineEdit("100")
 
         # Results Widgets
         results_label = QLabel("Result Summary")
@@ -186,13 +222,22 @@ class MyWindow(QMainWindow):
         self.thrust_val = QLabel(" ")
         self.thrust_val.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-
         # Create layout and add widgets
         option_layout = QGridLayout()
-        add_to_layout = lambda col, start, *widgets: [option_layout.addWidget(widget, i+start, col) for i, widget in enumerate(widgets)]
-        add_to_layout(0, 0, DC_label, prop_label, self.prop_list, noz_label, self.noz_type_list, pressure_label, self.P_chamber, temp_label, self.T_chamber, converg_label, self.converg_ang, diverg_label, self.diverg_angle)
-
-        add_to_layout(1, 1,radius_inlet_label, self.radius_inlet, self.radius_throat_label, self.radius_throat, self.radius_exit_label, self.radius_exit, M_exit_label, self.M_exit_val, amb_press_label, self.P_amb_val, thrust_design_label, self.thrust_design)
+        add_to_layout = lambda col, start, *widgets: [
+            option_layout.addWidget(
+                widget, i+start, col) for i, widget in enumerate(widgets)]
+        add_to_layout(0, 0, DC_label, prop_label, self.prop_list, noz_label,
+                      self.noz_type_list, P_chamber_label, self.P_chamber_val,
+                      T_chamber_label, self.T_chamber_val, converg_label,
+                      self.converg_ang_val, diverg_label,
+                      self.diverg_angle_val, self.optimize_button)
+        add_to_layout(1, 1,radius_inlet_label, self.radius_inlet_val,
+                      self.radius_throat_label, self.radius_throat_val,
+                      self.radius_exit_label, self.radius_exit_val,
+                      M_exit_label, self.M_exit_val, P_amb_label,
+                      self.P_amb_val, thrust_design_label,
+                      self.thrust_design_val)
         v_spacer = QSpacerItem(
         20, 40,
         QSizePolicy.Policy.Minimum,   # Doesn’t expand sideways
@@ -207,8 +252,12 @@ class MyWindow(QMainWindow):
 
         option_layout.addWidget(results_label, 17, 0)
         option_layout.addWidget(self.result_display_label, 18, 0, 1, 2)
-        add_to_layout(0,19, P_e_sup_label, self.P_e_sup_val, P_e_shock_label, self.P_e_shock_val, m_dot_label, self.m_dot_val, ISP_label, self.ISP_val)
-        add_to_layout(1,19, P_e_sub_label, self.P_e_sub_val, P_star_shock_label, self.P_star_shock_val, P_exit_label, self.P_exit_val, thrust_label, self.thrust_val)
+        add_to_layout(0,19, P_e_sup_label, self.P_e_sup_val, P_e_shock_label,
+                      self.P_e_shock_val, m_dot_label, self.m_dot_val,
+                      ISP_label, self.ISP_val)
+        add_to_layout(1,19, P_e_sub_label, self.P_e_sub_val,
+                      P_star_shock_label, self.P_star_shock_val, P_exit_label,
+                      self.P_exit_val, thrust_label, self.thrust_val)
 
         graphic_layout = QVBoxLayout()
         self.canvas = MplCanvas(self)
@@ -239,8 +288,8 @@ class MyWindow(QMainWindow):
             self.k=1.667
 
         # Extract thermo. properties
-        self.T_0 = float(self.T_chamber.text())
-        self.P_0 = float(self.P_chamber.text())
+        self.T_0 = float(self.T_chamber_val.text())
+        self.P_0 = float(self.P_chamber_val.text())
         rho_0 = self.P_0/(self.R_spec*self.T_0)
         self.P_amb = float(self.P_amb_val.text())
 
@@ -250,56 +299,66 @@ class MyWindow(QMainWindow):
         self.M_throat = 1
 
         # Geometry
-        r_throat = float(self.radius_throat.text())
-        r_inlet = float(self.radius_inlet.text())
-        r_outlet = float(self.radius_exit.text())
-        self.A_star = math.pi*(r_throat**2)
-        A_inlet = math.pi*(r_inlet**2)
-        self.A_outlet = math.pi*(r_outlet**2)
-        converg_angle= np.deg2rad(float(self.converg_ang.text()))
-        diverg_angle = np.deg2rad(float(self.diverg_angle.text()))
-        converg_length = (r_inlet-r_throat)/np.tan(converg_angle)
-        diverg_length = (r_outlet-r_throat)/np.tan(diverg_angle)
+        self.r_throat = float(self.radius_throat_val.text())
+        self.r_inlet = float(self.radius_inlet_val.text())
+        self.r_outlet = float(self.radius_exit_val.text())
+        self.converg_angle= np.deg2rad(float(self.converg_ang_val.text()))
+        self.diverg_angle = np.deg2rad(float(self.diverg_angle_val.text()))
+
+    def calc_thermo(self):
+        self.A_star = math.pi*(self.r_throat**2)
+        self.A_inlet = math.pi*(self.r_inlet**2)
+        self.A_outlet = math.pi*(self.r_outlet**2)
         res = 150
+        converg_length = (self.r_inlet-self.r_throat)/np.tan(
+            self.converg_angle)
+        diverg_length = (self.r_outlet-self.r_throat)/np.tan(
+            self.diverg_angle)
         self.x_conv = -np.flip(np.linspace(0, converg_length, res))
-        self.y_conv = r_throat -self.x_conv*np.tan(converg_angle)
+        self.y_conv = self.r_throat -self.x_conv*np.tan(self.converg_angle)
         
         if self.noz_type_list.currentIndex() == 0:
             M_exit = float(self.M_exit_val.text())
-            self.x_div, self.y_div, *_ = MOC.gen_MOC_FLN(M_exit, r_throat, k=self.k,
-                                               div=50)
-            r_outlet = np.max(self.y_div)
-            self.A_outlet = math.pi*(r_outlet**2)
-            self.converg_ang.setReadOnly(True)
-            self.diverg_angle.setReadOnly(True)
-            self.radius_exit.setReadOnly(True)
+            self.x_div, self.y_div, *_ = MOC.gen_MOC_FLN(M_exit, self.r_throat,
+                                                         k=self.k, div=50)
+            self.r_outlet = np.max(self.y_div)
+            self.A_outlet = math.pi*(self.r_outlet**2)
+            self.converg_ang_val.setReadOnly(True)
+            self.diverg_angle_val.setReadOnly(True)
+            self.radius_exit_val.setReadOnly(True)
             self.M_exit_val.setReadOnly(False)
         elif self.noz_type_list.currentIndex() == 1:
             M_exit = float(self.M_exit_val.text())
-            self.x_div, self.y_div, *_ = MOC.gen_MOC_MLN(M_exit, r_throat, k=self.k,
-                                               div=50)
-            r_outlet = np.max(self.y_div)
-            self.A_outlet = math.pi*(r_outlet**2)
-            self.converg_ang.setReadOnly(True)
-            self.diverg_angle.setReadOnly(True)
-            self.radius_exit.setReadOnly(True)
+            self.x_div, self.y_div, *_ = MOC.gen_MOC_MLN(M_exit, self.r_throat,
+                                                         k=self.k, div=50)
+            self.r_outlet = np.max(self.y_div)
+            self.A_outlet = math.pi*(self.r_outlet**2)
+            self.converg_ang_val.setReadOnly(True)
+            self.diverg_angle_val.setReadOnly(True)
+            self.radius_exit_val.setReadOnly(True)
             self.M_exit_val.setReadOnly(False)
         elif self.noz_type_list.currentIndex() == 2:
-            self.converg_ang.setReadOnly(False)
-            self.diverg_angle.setReadOnly(False)
-            self.radius_exit.setReadOnly(False)
+            self.converg_ang_val.setReadOnly(False)
+            self.diverg_angle_val.setReadOnly(False)
+            self.radius_exit_val.setReadOnly(False)
             self.M_exit_val.setReadOnly(True)
             self.x_div = np.linspace(0, diverg_length, res)
-            self.y_div = r_throat + self.x_div*np.tan(diverg_angle)
-    
-    def calc_thermo(self):
+            self.y_div = self.r_throat + self.x_div*np.tan(self.diverg_angle)
+
+        grey_out_style = """QLineEdit[readOnly="true"] {background-color: #a3a3a3; color: white; }
+            QLineEdit[readOnly="false"] { background-color: white; color: black; }"""
+        self.converg_ang_val.setStyleSheet(grey_out_style)
+        self.diverg_angle_val.setStyleSheet(grey_out_style)
+        self.radius_exit_val.setStyleSheet(grey_out_style)
+        self.M_exit_val.setStyleSheet(grey_out_style)
+
         try:
             M_e_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100],
-                                  args=(self.M_throat,self.A_outlet,self.A_star,
-                                        self.k)).root
+                                  args=(self.M_throat, self.A_outlet,
+                                        self.A_star, self.k)).root
             M_e_sub = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1],
-                                  args=(self.M_throat,self.A_outlet,self.A_star,
-                                        self.k)).root
+                                  args=(self.M_throat, self.A_outlet,
+                                        self.A_star, self.k)).root
         except ValueError as e:
             print("Unable to solve for Mach numbers." +
                   "Expand solver bracket to ensure solution exists.")
@@ -327,7 +386,8 @@ class MyWindow(QMainWindow):
             A_x = math.pi*(self.y_div[-1]**2)
             # Mach number before shock
             M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100],
-                                  args=(self.M_throat,A_x,self.A_star,self.k)).root
+                                  args=(self.M_throat, A_x, self.A_star,
+                                        self.k)).root
             P_x = AT.calc_isen_press(M_x_sup,self.P_0,self.k)
             T_x = AT.calc_isen_temp(M_x_sup,self.T_0,self.k)
             M_y,P_y = AT.calc_M_P_normal(M_x_sup,P_x,self.k)
@@ -347,7 +407,8 @@ class MyWindow(QMainWindow):
             # Solve for shock at onset of divergent section
             A_x = math.pi*(self.y_div[1]**2)
             M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100],
-                                  args=(self.M_throat,A_x,self.A_star,self.k)).root
+                                  args=(self.M_throat, A_x, self.A_star,
+                                        self.k)).root
             P_x = AT.calc_isen_press(M_x_sup,self.P_0,self.k)
             T_x = AT.calc_isen_temp(M_x_sup,self.T_0,self.k)
             M_y,P_y = AT.calc_M_P_normal(M_x_sup,P_x,self.k)
@@ -388,19 +449,22 @@ class MyWindow(QMainWindow):
                 # Back pressure is too high for choked subsonic flow
                 self.result_display_label.setText(
                     "Back pressure too high for choked subsonic flow")
-                M_e_sub = root_scalar(AT.RS_Mach_Press_Isen, bracket=[0.0001,1],
-                                      args=(0,self.P_amb,self.P_0,self.k)).root
+                M_e_sub = root_scalar(
+                    AT.RS_Mach_Press_Isen,
+                    bracket=[0.0001,1],
+                    args=(0,self.P_amb,self.P_0,self.k)).root
                 self.M_throat = root_scalar(AT.RS_Area_Mach_X_Y,
                                             bracket=[0.0001,1], 
-                                            args=(M_e_sub,self.A_star,self.A_outlet,
-                                                  self.k)).root
+                                            args=(M_e_sub, self.A_star,
+                                                  self.A_outlet, self.k)).root
                 
                 for index in range(len(self.x_div)):
                     A_x = math.pi*(self.y_div[index]**2)
                     shift = index + len(self.x_conv)
 
                     M_x = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1],
-                                      args=(M_e_sub, A_x, self.A_outlet,self.k)).root
+                                      args=(M_e_sub, A_x, self.A_outlet, 
+                                            self.k)).root
                     P_x = AT.calc_isen_press(M_x,self.P_0,self.k)
                     T_x = AT.calc_isen_temp(M_x,self.T_0,self.k)
 
@@ -416,10 +480,11 @@ class MyWindow(QMainWindow):
                     shift = index + len(self.x_conv)
                     if not shock_flag:
                         # Pre shock wave prop
-                        M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y,
-                                              bracket=[1,100], args=(
-                                                  self.M_throat,A_x,self.A_star,
-                                                  self.k)).root
+                        M_x_sup = root_scalar(
+                            AT.RS_Area_Mach_X_Y,
+                            bracket=[1,100],
+                            args=(self.M_throat, A_x, self.A_star, self.k)
+                            ).root
                         P_x = AT.calc_isen_press(M_x_sup,self.P_0,self.k)
                         T_x = AT.calc_isen_temp(M_x_sup,self.T_0,self.k)
                         self.P_array[shift] = P_x
@@ -434,27 +499,32 @@ class MyWindow(QMainWindow):
                         self.A_star_shock = A_x * M_y * (
                             ((2/(self.k+1))*(1+((self.k-1)/2)*M_y*M_y))**(
                                 (-self.k-1)/(2*self.k-2)))
-                        M_y_e = root_scalar(AT.RS_Area_Mach_X_Y,
-                                            bracket=[0.0001,1], args=(
-                                                self.M_throat,self.A_outlet,
-                                                self.A_star_shock,self.k)).root   
-                        P_y_e = AT.calc_isen_press(M_y_e,self.P_0_y,self.k)
-                        T_y_e = self.T_0_y * ((1+ ((self.k-1)/2)*M_y_e*M_y_e)**-1)
+                        M_y_e = root_scalar(
+                            AT.RS_Area_Mach_X_Y,
+                            bracket=[0.0001,1], 
+                            args=(self.M_throat, self.A_outlet,
+                                  self.A_star_shock, self.k)).root   
+                        P_y_e = AT.calc_isen_press(M_y_e, self.P_0_y, self.k)
+                        T_y_e = self.T_0_y * ((1+((self.k-1)/2)*M_y_e*M_y_e)
+                                              **-1)
 
                         if abs((P_y_e - self.P_amb)/P_y_e) < 0.1:
                             print('Shock location calculated')
                             shock_flag = True
                             self.x_shock = self.x_div[index]
                             self.result_display_label.setText(
-                                'Normal shock generated in divergent section'+
+                                'Normal shock generated in divergent section' +
                                 f'at {self.x_shock:.3f} m')
                     elif shock_flag:
-                        M_y_curr = root_scalar(AT.RS_Area_Mach_X_Y,
-                                               bracket=[0.0001,1],
-                                               args=(self.M_throat,A_x,
-                                                     self.A_star_shock,self.k)).root
-                        P_y_curr = AT.calc_isen_press(M_y_curr, self.P_0_y,self.k)
-                        T_y_curr = AT.calc_isen_temp(M_y_curr, self.T_0_y,self.k)
+                        M_y_curr = root_scalar(
+                            AT.RS_Area_Mach_X_Y,
+                            bracket=[0.0001,1],
+                            args=(self.M_throat, A_x, self.A_star_shock, 
+                                  self.k)).root
+                        P_y_curr = AT.calc_isen_press(M_y_curr, self.P_0_y, 
+                                                      self.k)
+                        T_y_curr = AT.calc_isen_temp(M_y_curr, self.T_0_y, 
+                                                     self.k)
                         self.P_array[shift] = P_y_curr
                         self.M_array[shift] = M_y_curr
                         self.T_array[shift] = T_y_curr
@@ -467,8 +537,8 @@ class MyWindow(QMainWindow):
                     A_x = math.pi*(self.y_div[index]**2)
                     shift = index + len(self.x_conv)
                     M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100],
-                                          args=(self.M_throat,A_x,self.A_star,
-                                                self.k)).root
+                                          args=(self.M_throat, A_x,
+                                                self.A_star, self.k)).root
                     P_x = AT.calc_isen_press(M_x_sup,self.P_0,self.k)
                     T_x = AT.calc_isen_temp(M_x_sup,self.T_0,self.k)
                     self.P_array[shift] = P_x
@@ -476,8 +546,10 @@ class MyWindow(QMainWindow):
                     self.T_array[shift] = T_x
 
                 beta, theta = fsolve(
-                    AT.FS_oblique_angle,[np.radians(45),np.radians(45)],
-                    args=(self.M_array[-1],self.P_array[-1],self.P_amb,self.k))
+                    AT.FS_oblique_angle,
+                    [np.radians(45),np.radians(45)],
+                    args=(self.M_array[-1], self.P_array[-1], self.P_amb, 
+                          self.k))
                 x_over_shock_1 = self.x_div[-1]
                 y_over_shock_1 = self.y_div[-1]
                 hyp = y_over_shock_1 * 0.6
@@ -496,8 +568,8 @@ class MyWindow(QMainWindow):
                     A_x = math.pi*(self.y_div[index]*self.y_div[index])
                     shift = index + len(self.x_conv)
                     M_x_sup = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[1,100],
-                                          args=(self.M_throat,A_x,self.A_star,
-                                                self.k)).root
+                                          args=(self.M_throat, A_x,
+                                                self.A_star, self.k)).root
                     P_x = AT.calc_isen_press(M_x_sup,self.P_0,self.k)
                     T_x = AT.calc_isen_temp(M_x_sup,self.T_0,self.k)
                     self.P_array[shift] = P_x
@@ -552,7 +624,8 @@ class MyWindow(QMainWindow):
         for index in range(len(self.x_conv)):
             A_x = math.pi*(self.y_conv[index]**2)
             M_x_sub = root_scalar(AT.RS_Area_Mach_X_Y, bracket=[0.0001,1],
-                                  args=(self.M_throat,A_x,self.A_star,self.k)).root
+                                  args=(self.M_throat, A_x, self.A_star,
+                                        self.k)).root
             P_x = AT.calc_isen_press(M_x_sub,self.P_0,self.k)
             T_x = self.T_0 * ((1+ ((self.k-1)/2)*M_x_sub*M_x_sub)**-1)
 
@@ -560,11 +633,7 @@ class MyWindow(QMainWindow):
             self.M_array[index] = M_x_sub
             self.T_array[index] = T_x
 
-    def update_result(self):
-        """
-        Main function that gets triggered by a UI event. Extracts UI data and
-        recalculates flow thermodynamics.
-        """
+    def plot_data(self):
         def reflect_plot():
             """
             Reflects the plot on the opposite side of the x-axis
@@ -577,24 +646,8 @@ class MyWindow(QMainWindow):
                 self.canvas.axes.plot(x_data, -y_data,
                     color=line.get_color(),
                     linestyle=line.get_linestyle(),
-                    linewidth=line.get_linewidth())  # Slightly transparent
+                    linewidth=line.get_linewidth())
 
-        # Clear plots
-        self.canvas.axes.clear()
-        self.canvas.axes_2.clear()
-        self.canvas.axes_3.clear()
-        self.canvas.axes_4.clear()
-
-        # Extract UI data
-        self.extract_UI_data()
-
-        # Load styles
-        self.load_styles()
-
-        # Thermodynamics
-        self.calc_thermo()
-
-        # Plot data
         self.canvas.axes.plot(self.x_conv, self.y_conv, 'b-', linewidth=2)
         self.canvas.axes.plot(self.x_div, self.y_div, 'b-', linewidth=2)   
         reflect_plot()
@@ -628,29 +681,77 @@ class MyWindow(QMainWindow):
         # Refresh canvas
         self.canvas.draw()
 
+    def update_result(self):
+        """
+        Main function that gets triggered by a UI event. Extracts UI data and
+        recalculates flow thermodynamics.
+        """
+        self.canvas.axes.clear()
+        self.canvas.axes_2.clear()
+        self.canvas.axes_3.clear()
+        self.canvas.axes_4.clear()
+
+        # Extract UI data
+        self.extract_UI_data()
+
+        # Thermodynamics
+        self.calc_thermo()     
+
+        # Load styles
+        #self.load_styles()
+
+        # Plot data
+        self.plot_data()
+
     def calc_opt_geom(self):
-        thr_design = float(self.thrust_design.text())
-        area_ratio = self.A_outlet / self.A_throat
-        iteration_max = 100
-        tol = 0.01
+        max_iterations=1000
+        thr_design = float(self.thrust_design_val.text())
+        area_ratio_outlet = self.A_outlet / self.A_star
+        area_ratio_inlet = self.A_inlet / self.A_star
+        tol=thr_design/10000
+        optimizer = ADAM_Optimizer(learning_rate=1E-3)
 
-        def calc_gradient(area_throat,delta=.01):
-            area_throat += delta
+        def calc_cost():
+            self.calc_thermo()
+            thr_curr = self.thr
+            return (thr_curr - thr_design)**2
+
+        def calc_gradient(delta=.0001):
+            self.r_throat += delta
+            self.r_outlet = ((self.r_throat**2) * area_ratio_outlet)**0.5
+            self.r_inlet = ((self.r_throat**2) * area_ratio_inlet)**0.5
             
-            self.extract_UI_data()
+            cost_plus = calc_cost()
+            self.r_throat -= delta
+            self.r_outlet = ((self.r_throat**2) * area_ratio_outlet)**0.5
+            self.r_inlet = ((self.r_throat**2) * area_ratio_inlet)**0.5
+            cost_minus = calc_cost()
+            return (cost_plus - cost_minus) / (2*delta)            
 
-            
+        for iteration in range(max_iterations):
+            cost_curr = calc_cost()
 
-        for iteration in range(iteration_max):
-            self.update_result()
-            cost = thr_design - self.thr
-
-            if cost < tol:
-                print(f"Converged after {iteration} iterations")
+            if abs(cost_curr) < tol:
+                self.optimize_button.setText("Optimization Successful!")
+                self.plot_data()
                 break
 
-            
+            gradient = calc_gradient()
+            update = optimizer.update(gradient)
 
+            self.r_throat -= update
+            self.r_outlet = ((self.r_throat**2) * area_ratio_outlet)**0.5
+            self.r_inlet = ((self.r_throat**2) * area_ratio_inlet)**0.5
+            self.radius_throat_val.setText("{:.4g}".format(self.r_throat))
+            self.radius_exit_val.setText("{:.4g}".format(self.r_outlet))
+            self.radius_inlet_val.setText("{:.4g}".format(self.r_inlet))
+            self.optimize_button.setText("Optimizing... Itr: " + str(iteration))
+
+            QApplication.processEvents()
+
+        else:
+            print(f"Convergence failed after {max_iterations:.0f} iterations")
+        
 
 
 if __name__ == "__main__":
