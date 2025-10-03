@@ -255,6 +255,11 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
     x_contour_fit = np.linspace(x_contour[0], x_contour[-1], res)
     y_contour_fit = high_poly_law(x_contour_fit, a, b, c, d, e)
 
+    # Curve fitting can yield points slightly smalller than throat
+    offset = y_contour[0] - y_contour_fit[0]
+    if offset > 0:
+        y_contour_fit = y_contour_fit + offset*1.01
+
     return x_contour_fit, y_contour_fit, x_n, y_n, M_n
 
 def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
@@ -468,7 +473,9 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
 if __name__ == "__main__":
     # Test script
     x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,.5,1.4,7, True, True)
-  
+    plt.figure()
+    plt.plot(x_contour, y_contour, 'k-', linewidth=2)
+
     # Interpolated color mesh based on Mach number
     plt.figure()
     x_n = np.append(x_n, max(x_n))
@@ -488,4 +495,6 @@ if __name__ == "__main__":
     plt.axis('equal')
 
     x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(3,.5,1.4,30, True, True)
+    plt.figure()
+    plt.plot(x_contour, y_contour, 'k-', linewidth=2)
     plt.show()

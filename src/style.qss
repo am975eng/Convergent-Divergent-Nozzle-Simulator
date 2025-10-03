@@ -53,7 +53,15 @@ QLabel.title {
 }
 
 /* Text input styles */
-QLineEdit {
+QLineEdit[readOnly="true"] {
+    border: 1px solid #cccccc;
+    border-radius: 3px;
+    padding: 6px;
+    background-color: #a3a3a3;
+    color: white;
+}
+
+QLineEdit[readOnly="false"] {
     border: 1px solid #cccccc;
     border-radius: 3px;
     padding: 6px;
