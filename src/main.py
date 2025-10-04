@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 import math
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -31,6 +31,7 @@ from scipy.optimize import (
 
 import Aero_Thermo as AT
 import Method_Of_Char as MOC
+
 
 class ADAM_Optimizer:
     def __init__(self, learning_rate=0.01, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
@@ -108,6 +109,13 @@ class MyWindow(QMainWindow):
         self.load_styles()
         self.init_UI()
 
+        self._debounce = QTimer(singleShot=True, interval=400)
+        self._debounce.timeout.connect(self.update_result)
+
+    def _schedule_update(self):
+        # Start the debounce timer to prevent rapid updates
+        self._debounce.start()
+
     def load_styles(self):
         """Load styles from QSS file"""
         try:
@@ -126,6 +134,7 @@ class MyWindow(QMainWindow):
 
     def init_UI(self):
         """Sets up UI by creating and positioning widgets."""
+        
         # Set window properties
         self.setWindowTitle("CGT Designer")
         widget = QWidget()
@@ -136,51 +145,52 @@ class MyWindow(QMainWindow):
         prop_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.prop_list = QComboBox()
         self.prop_list.addItems(["Air", "CO2", "N2", "Xe"])
-        self.prop_list.currentTextChanged.connect(self.update_result)
+        self.prop_list.currentTextChanged.connect(self._schedule_update)
         noz_label = QLabel("Nozzle Geometry Type")
         noz_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.noz_type_list = QComboBox()
         self.noz_type_list.addItems(["MOC Full Length Nozzle",
                                      "MOC Minimum Length Nozzle", "Conical"])
-        self.noz_type_list.currentTextChanged.connect(self.update_result)
+        self.noz_type_list.currentTextChanged.connect(self._schedule_update)
         P_chamber_label = QLabel("Chamber Pressure [Pa]")
         P_chamber_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.P_chamber_val = QLineEdit("5000")
-        self.P_chamber_val.textChanged.connect(self.update_result)
+        self.P_chamber_val.textChanged.connect(self._schedule_update)
         T_chamber_label = QLabel("Chamber Temperature [K]")
         T_chamber_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.T_chamber_val = QLineEdit("293.15")
-        self.T_chamber_val.textChanged.connect(self.update_result)
+        self.T_chamber_val.textChanged.connect(self._schedule_update)
         P_amb_label = QLabel("Ambient Pressure [Pa]")
         P_amb_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.P_amb_val = QLineEdit("0")
-        self.P_amb_val.textChanged.connect(self.update_result)
+        self.P_amb_val.textChanged.connect(self._schedule_update)
         converg_label = QLabel("Convergence Angle [Deg]")
         converg_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.converg_ang_val = QLineEdit("45")
-        self.converg_ang_val.textChanged.connect(self.update_result)
+        self.converg_ang_val.textChanged.connect(self._schedule_update)
         diverg_label = QLabel("Divergence Angle [Deg]")
         diverg_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.diverg_angle_val = QLineEdit("15")
-        self.diverg_angle_val.textChanged.connect(self.update_result)
+        self.diverg_angle_val.textChanged.connect(self._schedule_update)
         self.optimize_button = QPushButton("Optimize Geometry")
         self.optimize_button.clicked.connect(self.calc_opt_geom)
 
         radius_inlet_label = QLabel("Inlet Radius [m]")
         radius_inlet_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.radius_inlet_val = QLineEdit("0.1")
-        self.radius_inlet_val.textChanged.connect(self.update_result)
+        self.radius_inlet_val.textChanged.connect(self._schedule_update)
         self.radius_throat_label = QLabel("Throat Radius [m]")
         self.radius_throat_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.radius_throat_val = QLineEdit("0.08")
-        self.radius_throat_val.textChanged.connect(self.update_result)
+        self.radius_throat_val.textChanged.connect(self._schedule_update)
         self.radius_exit_label = QLabel("Exit Radius [m]")
         self.radius_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.radius_exit_val = QLineEdit("0.1")
-        self.radius_exit_val.textChanged.connect(self.update_result)
+        self.radius_exit_val.textChanged.connect(self._schedule_update)
         M_exit_label = QLabel("Exit Mach Number")
         M_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.M_exit_val = QLineEdit("2.0")
+        self.M_exit_val.textChanged.connect(self._schedule_update)
         thrust_design_label = QLabel("Design Thrust [N]")
         thrust_design_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.thrust_design_val = QLineEdit("100")
