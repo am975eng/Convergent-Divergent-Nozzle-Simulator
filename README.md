@@ -1,8 +1,22 @@
 # About The Project
-Convergent-divergent nozzles are critical in generating useful thrust by accelerating combustion chamber gasses to supersonic speeds. This user friendly simulator allows a designer to analyze flow properties all along the nozzle as well as analyze tradeoffs due to design changes. The simulator takes into account back pressure to calculate normal shock locations in the divergent section and determine if flow is choked or subsonic.
+**Convergent-divergent nozzle simulator** is a Python GUI that generates thermodynamic properties for a variety of nozzle geometries as well as optimize design for an ideal thrust.
+
+# Table of Contents
+- [Theory](#theory)
+- [Getting Started](#getting-started)
+- [Installation](#installation)
 
 ## Theory
-Initially the code assumes 1D steady adiabatic isentropic flow with an ideal gas of constant specific heats. Supersonic and subsonic flow is calculated and compared with back pressure P_e to determine if pressure matching is satisfied. If pressure lies between these two ranges, the code sweeps through the divergent section plotting normal shocks and calculating post-shockwave properties. Exit pressure is calculated using the area-mach relation and isentropic pressure relation. In the case that exit pressure is lower than back pressure even with a shock at exit, an overexpanded exhaust with oblique shocks and Mach diamonds generated in the plume is assumed. If back pressure is lower than supersonic exit pressure, an underexpanded flow is assumed.
+Initially the code assumes **1D steady adiabatic isentropic** flow with an ideal gas of constant specific heats. The code begins by calculating supersonic and subsonic critical exit pressures by using the area-Mach relation assuming choked flow. It then compares ambient pressure to critical pressure conditions to determine the type of flow produced. 
+If ambient pressure is above chamber pressure then reverse flow is produced.
+If ambient pressure is above the subsonic limit, the code assumes subsonic flow throughout the entire nozzle.
+If ambient pressure is less than subsonic, the code sweeps through the divergent section plotting normal shocks and calculating post-shockwave properties at each location trying to match ambient conditions.
+If a nozzle at exit can not bring pressure low enough, then the nozzle is overexpanded and Prandtl-Meyer shockwaves are plotted in the exhaust plume. 
+If ambient pressure is lower than supersonic exit pressure then the nozzle is underexpanded with oblique shockwaves produced in the exhaust.
+
+Once flow type is established, the code uses isentropic relations, stagnation conditions, and area-Mach relation to generate Mach, temperature, and pressure curves at each contour point.
+
+Method of characteristics is a type of solution method for solving partial differential equations through reduction to an ordinary differential equation. We initially begin with the continuity equation and Euler's equation derived from the inviscid assumption for Navier-Stokes equations. The velocity potential is derived from these equations and is of the form (1). At every point A, the slope of the characteristic line is given as (2) in which the PDE reduces to compatibility equations.
 
 # Getting Started
 
@@ -15,7 +29,7 @@ The code is built with Python 3 and dependencies can be installed using the foll
     cd Convergent-Divergent-Nozzle-Simulator
     ```
 
-2.  (Recommended) Create and activate a virtual environment:
+2.  (Optional) Create and activate a virtual environment:
     ```bash
     python -m venv test_venv
     Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass # If first time using venv
@@ -25,4 +39,9 @@ The code is built with Python 3 and dependencies can be installed using the foll
 3.  Install the dependencies:
     ```bash
     pip install -r requirements.txt
+    ```
+
+4.  Run main script
+    ```bash
+    python main.py
     ```

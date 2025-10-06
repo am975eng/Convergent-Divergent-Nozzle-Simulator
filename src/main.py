@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QPushButton)
 from matplotlib.backends.backend_qt5agg import (
-    FigureCanvasQTAgg as FigureCanvas,)
+    FigureCanvasQTAgg as FigureCanvas)
 from matplotlib.figure import Figure
 from matplotlib.collections import LineCollection
 from matplotlib.colors import LinearSegmentedColormap
@@ -26,51 +26,17 @@ from matplotlib import colors as mpl_colors
 import numpy as np
 from scipy.optimize import (
     fsolve,
-    root_scalar,
-)
+    root_scalar)
 
 import Aero_Thermo as AT
 import Method_Of_Char as MOC
+from Optimizer import ADAM_Optimizer
 
-
-class ADAM_Optimizer:
-    def __init__(self, learning_rate=0.01, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
-        self.lr = learning_rate
-        self.beta_1 = beta_1
-        self.beta_2 = beta_2
-        self.epsilon = epsilon
-        self.m = 0  # Momentum
-        self.v = 0  # Adaptive learning rate
-        self.t = 0  # Timestep
-        
-    def update(self, gradient):
-        self.t += 1
-        
-        # Update biased first moment estimate
-        self.m = self.beta_1 * self.m + (1 - self.beta_1) * gradient
-        
-        # Update biased second raw moment estimate  
-        self.v = self.beta_2 * self.v + (1 - self.beta_2) * (gradient ** 2)
-        
-        # Compute bias-corrected first moment estimate
-        m_hat = self.m / (1 - self.beta_1 ** self.t)
-        
-        # Compute bias-corrected second raw moment estimate
-        v_hat = self.v / (1 - self.beta_2 ** self.t)
-        
-        # Update parameters
-        update = self.lr * m_hat / (np.sqrt(v_hat) + self.epsilon)
-        
-        return update
-    
-    def reset(self):
-        self.m = 0
-        self.v = 0
-        self.t = 0
 
 class MplCanvas(FigureCanvas):
     """
-    Matplotlib canvas generated using Agg engine that can function as a QWidget.
+    Matplotlib canvas generated using Agg engine that can function as a
+    QWidget.
     """
     def __init__(self, parent=None):
         """
@@ -355,8 +321,10 @@ class MyWindow(QMainWindow):
             self.x_div = np.linspace(0, diverg_length, res)
             self.y_div = self.r_throat + self.x_div*np.tan(self.diverg_angle)
 
-        grey_out_style = """QLineEdit[readOnly="true"] {background-color: #a3a3a3; color: white; }
-            QLineEdit[readOnly="false"] { background-color: white; color: black; }"""
+        grey_out_style = """QLineEdit[readOnly="true"]""" + 
+            """ {background-color: #a3a3a3; color: white; }""" +
+            """QLineEdit[readOnly="false"]""" + 
+            """ { background-color: white; color: black; }"""
         self.converg_ang_val.setStyleSheet(grey_out_style)
         self.diverg_angle_val.setStyleSheet(grey_out_style)
         self.radius_exit_val.setStyleSheet(grey_out_style)
@@ -620,7 +588,8 @@ class MyWindow(QMainWindow):
             c_e = (self.k*self.R_spec*self.T_e)**0.5
             V_e = self.M_e * c_e
             self.m_dot = self.rho_e * self.A_outlet * self.M_e * c_e
-            self.thr = self.m_dot * V_e + (self.P_e - self.P_amb) * self.A_outlet
+            self.thr = self.m_dot * V_e + (
+                self.P_e - self.P_amb) * self.A_outlet
             self.ISP = self.thr/(self.m_dot*9.81)
 
             self.m_dot_val.setText(f"{self.m_dot:.3g}")
@@ -663,6 +632,14 @@ class MyWindow(QMainWindow):
         reflect_plot()
 
         def gen_cmap_plot(x,y,ax):
+            """
+            Generates a colormap plot of the given data.
+
+            Inputs:
+                x (numpy array) - X-axis data
+                y (numpy array) - Y-axis data
+                ax (matplotlib axis) - Axis to plot on
+            """
             points = np.array([x, y]).T.reshape(-1, 1, 2)
             segments = np.concatenate([points[:-1], points[1:]], axis=1)
             cmap = plt.cm.RdYlBu 
@@ -714,19 +691,41 @@ class MyWindow(QMainWindow):
         self.plot_data()
 
     def calc_opt_geom(self):
+        """
+        Calculates the optimal nozzle geometry using a gradient descent
+        algorithm with an ADAM optimizer to match design thrust.
+        """
+
         max_iterations=1000
         thr_design = float(self.thrust_design_val.text())
         area_ratio_outlet = self.A_outlet / self.A_star
         area_ratio_inlet = self.A_inlet / self.A_star
-        tol=thr_design/10000
+        tol=thr_design/10000            # Tolerance for convergence
         optimizer = ADAM_Optimizer(learning_rate=1E-3)
 
         def calc_cost():
+            """
+            Calculates the cost function to be minimized
+
+            Returns:
+                (float) - Cost function
+            """
             self.calc_thermo()
             thr_curr = self.thr
             return (thr_curr - thr_design)**2
 
         def calc_gradient(delta=.0001):
+            """
+            Calculates the gradient of thrust with respect to throat radius 
+            dT/dr_throat.
+
+            Inputs:
+                delta (float) - Small increment to throat radius for numerical
+                differentiation
+            
+            Returns:
+                (float) - Gradient of thrust with respect to throat radius
+            """
             self.r_throat += delta
             self.r_outlet = ((self.r_throat**2) * area_ratio_outlet)**0.5
             self.r_inlet = ((self.r_throat**2) * area_ratio_inlet)**0.5
@@ -755,14 +754,14 @@ class MyWindow(QMainWindow):
             self.radius_throat_val.setText("{:.4g}".format(self.r_throat))
             self.radius_exit_val.setText("{:.4g}".format(self.r_outlet))
             self.radius_inlet_val.setText("{:.4g}".format(self.r_inlet))
-            self.optimize_button.setText("Optimizing... Itr: " + str(iteration))
+            self.optimize_button.setText("Optimizing... Itr: " + str(
+                iteration))
 
             QApplication.processEvents()
 
         else:
             print(f"Convergence failed after {max_iterations:.0f} iterations")
         
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -44,19 +44,19 @@ def gen_MOC_MLN(M_exit, r_throat, k=1.4, div=7, print_flag=False,
     Generates a minimum length nozzle using method of characteristics.
 
     Args:
-        M_exit (float): Exit Mach number.
-        r_throat (float): Throat radius.
-        k (float, optional): Ratio of specific heats. Defaults to 1.4.
-        div (int, optional): Number of initial grid lines. Defaults to 7.
-        print_flag (bool, optional): Print MOC results. Defaults False
-        plot_flag (bool, optional): Plot MOC results. Defaults False.
+        M_exit (float) - Exit Mach number.
+        r_throat (float) - Throat radius.
+        k (float, optional) - Ratio of specific heats. Defaults to 1.4.
+        div (int, optional) - Number of initial grid lines. Defaults to 7.
+        print_flag (bool, optional) - Print MOC results. Defaults False
+        plot_flag (bool, optional) - Plot MOC results. Defaults False.
 
     Returns:
-        x_contour (list): Contour x coordinates.
-        y_contour (list): Contour y coordinates.
-        x_n (numpy.ndarray): X coordinates.
-        y_n (numpy.ndarray): Y coordinates.
-        M_n (numpy.ndarray): Mach numbers."""
+        x_contour (list) - Contour x coordinates.
+        y_contour (list) - Contour y coordinates.
+        x_n (numpy.ndarray) - X coordinates.
+        y_n (numpy.ndarray) - Y coordinates.
+        M_n (numpy.ndarray) - Mach numbers."""
 
     theta_wall_max = AT.calc_prandtl_meyer(M_exit, k)/2 # Wall angle at throat
     init_theta = 0.375*np.pi/180                        # PM Fan Initial Ang
@@ -269,19 +269,19 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
     expansion and straightening section.
 
     Args:
-        M_exit (float): Exit Mach number
-        r_throat (float): Throat radius
-        k (float, optional): Specific heat ratio. Defaults to 1.4.
-        div (int, optional): Number of divisions. Defaults to 7.
-        print_flag (bool, optional): Print iteration details. Defaults to False.
-        plot_flag (bool, optional): Plot contour. Defaults to False.
+        M_exit (float) - Exit Mach number
+        r_throat (float) - Throat radius
+        k (float, optional) - Specific heat ratio. Defaults to 1.4.
+        div (int, optional) - Number of divisions. Defaults to 7.
+        print_flag (bool, optional) - Print iteration details. Defaults to False.
+        plot_flag (bool, optional) - Plot contour. Defaults to False.
 
     Returns:
-        x_contour (np.array): Contour x positions
-        y_contour (np.array): Contour y positions
-        x_n (np.array): Point x positions
-        y_n (np.array): Point y positions
-        M_n (np.array): Point Mach numbers
+        x_contour (np.array) - Contour x positions
+        y_contour (np.array) - Contour y positions
+        x_n (np.array) - Point x positions
+        y_n (np.array) - Point y positions
+        M_n (np.array) - Point Mach numbers
     """
 
     # Expansion Section based on circular arc
