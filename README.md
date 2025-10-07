@@ -1,5 +1,8 @@
 # About The Project
-**Convergent-divergent nozzle simulator** is a Python GUI that generates thermodynamic properties for a variety of nozzle geometries as well as optimize design for an ideal thrust.
+**Convergent-divergent Nozzle Simulator** is a Python GUI that computes thermodynamic properties for various nozzle geometries and optimizes the nozzle design to achieve ideal thrust.
+
+<img src="./assets/CD_Nozzle_Intro.gif" width="720">
+<img src="./assets/MOC_Mesh.PNG" width="720">
 
 # Table of Contents
 - [Theory](#theory)
@@ -7,16 +10,41 @@
 - [Installation](#installation)
 
 ## Theory
-Initially the code assumes **1D steady adiabatic isentropic** flow with an ideal gas of constant specific heats. The code begins by calculating supersonic and subsonic critical exit pressures by using the area-Mach relation assuming choked flow. It then compares ambient pressure to critical pressure conditions to determine the type of flow produced. 
+Initially the code assumes **1D steady adiabatic isentropic** flow with an ideal gas of constant specific heats. The code begins by calculating supersonic and subsonic critical exit pressures by using the area-Mach relation assuming choked flow. It then compares ambient pressure to critical pressure conditions to determine the type of flow produced.
+
 If ambient pressure is above chamber pressure then reverse flow is produced.
+
 If ambient pressure is above the subsonic limit, the code assumes subsonic flow throughout the entire nozzle.
+
 If ambient pressure is less than subsonic, the code sweeps through the divergent section plotting normal shocks and calculating post-shockwave properties at each location trying to match ambient conditions.
+
 If a nozzle at exit can not bring pressure low enough, then the nozzle is overexpanded and Prandtl-Meyer shockwaves are plotted in the exhaust plume. 
+
 If ambient pressure is lower than supersonic exit pressure then the nozzle is underexpanded with oblique shockwaves produced in the exhaust.
+
+<img src="./assets/Nozzle_Drawing.png" width=50%>
 
 Once flow type is established, the code uses isentropic relations, stagnation conditions, and area-Mach relation to generate Mach, temperature, and pressure curves at each contour point.
 
-Method of characteristics is a type of solution method for solving partial differential equations through reduction to an ordinary differential equation. We initially begin with the continuity equation and Euler's equation derived from the inviscid assumption for Navier-Stokes equations. The velocity potential is derived from these equations and is of the form (1). At every point A, the slope of the characteristic line is given as (2) in which the PDE reduces to compatibility equations.
+Method of characteristics is a solution method for solving partial differential equations through reduction to an ordinary differential equation. We initially begin with the continuity equation and Euler's equation derived from the inviscid assumption for Navier-Stokes equations. The velocity potential is derived from these equations and is of the form
+
+$$\left(1 - \frac{\Phi_x^2}{a^2}\right) \Phi_{xx}
++ \left(1 - \frac{\Phi_y^2}{a^2}\right) \Phi_{yy}
+- 2\,\frac{\Phi_x \Phi_y}{a^2}\, \Phi_{xy}
+= 0 $$
+
+For a hyperbolic PDE, at every point A, there exists characteristic lines in which the PDE reduce to ODE compatiblity equations. The direction of these characteristic or Mach lines is given as,
+
+$$\left(\frac{dy}{dx}_{char} = \tan{\theta \mp \mu} \right)$$
+
+The compatibility equation for these char lines with K- and K+ representing right and left running characateristic lines respectfully are,
+
+$$\theta + \nu(M) = const = K-$$
+$$\theta - \nu(M) = const = K+$$
+
+Starting with initially defined fluid properties, we can generate characteristic lines and solve for fluid properties at intersections by setting characteristic strengths equal to each other. For centerline points flow must flow at zero angle. Along the wall we find the intersection between an average of current and previous flow angles with the left running char line.
+
+<img src="./assets/Char_line.PNG" width=50%>
 
 # Getting Started
 
@@ -45,3 +73,41 @@ The code is built with Python 3 and dependencies can be installed using the foll
     ```bash
     python main.py
     ```
+
+## Basic Usage
+### User Inputs
+* All user inputs are assumed in SI units.
+
+* **Air, CO2, N2, and Xenon** are available as propellants for analysis.
+
+* **MOC full length nozzle** generates an expansion and straightening section with exit Mach number being used to map out contour.
+
+* **MOC minimum length nozzle** generates a sharper corner at throat with expansion fans canceled out along the contour. It represents the smallest possible length for a nozzle designed by method of characteristics.
+
+* **Conical nozzle option** is based on convergence and divergence angles with respect to throat radius and drawn to inlet and exit radii.
+Options not applicable to nozzle type will be **greyed out**.
+
+* **Chamber pressure and temperature** set stagnation conditions.
+
+* **Ambient pressure** is used to match exit pressure and determine flow type.
+
+* **Design Thrust** The thrust optimized for in the gradient descent algorithm. Takes into account momentum and pressure thrust.
+
+### Results Summary
+* Label prints out the current flow regime.
+
+* Supersonic choked exit pressure - Assumes choked perfectly expanded supersonic flow.
+
+* Subsonic choked exit pressure - Assumes near sonic choked throat that is compressed back to a subsonic exit.
+
+* Exit shock exit pressure - Assumes a normal shock at the very end of the nozzle.
+
+* Initial shock exit pressure - Assumes a normal shock at the initial portion of the divergent section.
+
+* Mass flow rate - Rate of mass transfer through nozzle.
+
+* Exit pressure - Actual exit pressure of the nozzle.
+
+* Specific impulse - Measure of efficiency a nozzle generates thrust.
+
+* Actual thrust - Thrust generated from $$F=\dot m_e V_e + (p_e-p_{amb})A_e$$

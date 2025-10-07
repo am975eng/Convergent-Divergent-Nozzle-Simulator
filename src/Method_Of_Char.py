@@ -473,8 +473,6 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
 if __name__ == "__main__":
     # Test script
     x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,.5,1.4,7, True, True)
-    plt.figure()
-    plt.plot(x_contour, y_contour, 'k-', linewidth=2)
 
     # Interpolated color mesh based on Mach number
     plt.figure()
@@ -494,7 +492,5 @@ if __name__ == "__main__":
     plt.colorbar(c)
     plt.axis('equal')
 
-    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(3,.5,1.4,30, True, True)
-    plt.figure()
-    plt.plot(x_contour, y_contour, 'k-', linewidth=2)
+    x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(2.5,.5,1.4,12, True, True)
     plt.show()
