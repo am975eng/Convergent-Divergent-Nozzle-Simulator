@@ -1,12 +1,21 @@
 # About The Project
 **Convergent-divergent Nozzle Simulator** is a Python GUI that computes thermodynamic properties for various nozzle geometries and optimizes the nozzle design to achieve ideal thrust.
-<center>
+<p align="center">
     <img src="./assets/CD_Nozzle_Intro.gif" width="720">
+</p>        
+<p align="center">
+    Figure 1: Nozzle GUI
+</p>
+<p align="center">
     <img src="./assets/MOC_Mesh.PNG" width="720">
-</center>
+</p>
+<p align="center">
+    Figure 2: Mesh of flow points using method of characteristics method.    
+</p>
 
 ## Features
 - 1D, steady, adiabatic, isentropic flow solver
+- Prandtl-Meyer and oblique shockwave plotting for overexpanded and underexpanded jets respectively
 - Method of characteristics nozzle contour generator
 - Thrust design using gradient descent algorithm with ADAM optimizer 
 - Cross-platform support (Windows/macOS/Linux) PyQt6 GUI
@@ -32,9 +41,12 @@ If ambient pressure is lower than supersonic exit pressure then the nozzle is un
 
 Once flow type is established, the code uses isentropic relations, stagnation conditions, and area-Mach relation to generate Mach, temperature, and pressure curves at each contour point.
 
-<center>
+<p align="center">
     <img src="./assets/Nozzle_Drawing.png" width=50%>
-</center>
+</p>
+<p align="center">
+    Figure 3: Pressure variation from chamber to exhaust with critical pressure conditions under various flow regimes.
+</p>
 
 Method of characteristics is a solution method for solving partial differential equations through reduction to an ordinary differential equation. We initially begin with the continuity equation and Euler's equation derived from the inviscid assumption for Navier-Stokes equations. The velocity potential is derived from these equations and is of the form
 
@@ -51,14 +63,13 @@ $$\theta - \nu(M) = const = K+$$
 
 Starting with initially defined fluid properties, we can generate characteristic lines and solve for fluid properties at intersections by setting characteristic strengths equal to each other. For centerline points flow must flow at zero angle. Along the wall we find the intersection between an average of current and previous flow angles with the left running char line.
 
-<figure>
-    <center>
-        <img src="./assets/Char_line.PNG" width=50%>
-        <figcaption>
-        Figure 3: Characteristic lines and streamline at point A. Source: ANSYS, Inc. (2020). "Lesson 6: Nozzle Tutorial Handout." ANSYS Innovation Courses. Retrieved from [https://innovationspace.ansys.com/courses/wp-content/uploads/2020/12/Lesson6-Handout-NT-v1.pdf]
-        </figcaption>
-    </center>
-</figure>
+<p align="center">
+    <img src="./assets/Char_line.PNG" width=50%>
+</p>
+<p align="center">
+    Figure 4: Characteristic lines and streamline at point A. Source: ANSYS, Inc. (2020). "Lesson 6: Nozzle Tutorial Handout." ANSYS Innovation Courses. Retrieved from [https://innovationspace.ansys.com/courses/wp-content/uploads/2020/12/Lesson6-Handout-NT-v1.pdf]
+</p>
+
 # Getting Started
 
 ## Prerequisites
