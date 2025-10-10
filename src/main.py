@@ -27,7 +27,8 @@ import numpy as np
 from scipy.optimize import (
     fsolve,
     root_scalar)
-from CoolProp.CoolProp import PropsSI, PhaseSI
+from CoolProp.CoolProp import PropsSI, PhaseSI, AbstractState
+import CoolProp.CoolProp as CP
 
 import Aero_Thermo as AT
 import Method_Of_Char as MOC
@@ -709,42 +710,78 @@ class MyWindow(QMainWindow):
         self.plot_data()
 
     def calc_depress(self):
-        P_curr = self.P_0
-        T_curr = self.T_0
         m_dot_curr = self.m_dot
         time_step = .0001
+        t = 0
 
-        V_chamb = self.len_inlet * (np.pi * (self.r_inlet**2))
-        rho_chamb = PropsSI('D', 'P', P_curr, 'T', T_curr, self.fluid)
-        m_curr = V_chamb * rho_chamb
+        # Initial Conditions
+        P_0_init = self.P_0
+        T_0_init = self.T_0
+        P_curr = self.P_0
+        T_curr = self.T_0
+        V_curr = self.len_inlet * (np.pi * (self.r_inlet**2))
+        rho_curr = PropsSI('D', 'P', P_curr, 'T', T_curr, self.fluid)
+        m_curr = V_curr * rho_curr
         h_curr = PropsSI('H', 'T', T_curr, 'P', P_curr, self.fluid)
         u_curr = PropsSI('U', 'T', T_curr, 'P', P_curr, self.fluid)
         H_curr = h_curr * m_curr
         U_curr = u_curr * m_curr
-        i = 0
+        C_d = 1
+        
+        AS = AbstractState("HEOS", self.fluid)
+
+        # Adiabatic Blowdown
         while m_curr > 0:
-            phase = PhaseSI('P', P_curr, 'T', T_curr, self.fluid)
+            t += time_step
+            m_curr = m_curr - m_dot_curr * time_step
+            c_0 = np.sqrt(self.k*self.R_spec * T_0_init)
+
+            exp = (self.k + 1) / (2 * self.k - 2)
+            tau = (V_curr / (C_d * self.A_star * c_0))*(((self.k+1)/2)**exp)
+            dPdt = - (self.k * P_0_init / tau) * (1 + ((self.k - 1) / 2) * (t / tau))**((2 * self.k) / (1 - self.k) - 1)
+            dP = dPdt * time_step
+            P_curr += dP
+            self.canvas.axes_depress.scatter(t, P_curr)
+            print(P_curr)
             print(m_curr)
-            print(phase)
-            if phase == 'gas':
-                m_curr = m_curr - m_dot_curr * time_step
-                rho_curr = m_curr / V_chamb
-                U_curr = U_curr - ((m_dot_curr * time_step) * (h_curr))
-                u_curr = U_curr / m_curr
-                
-                P_curr = PropsSI('P', 'u', u_curr, 'D', rho_curr, self.fluid)
-                T_curr = PropsSI('T', 'u', u_curr, 'D', rho_curr, self.fluid)
-                h_curr = PropsSI('H', 'u', u_curr, 'D', rho_curr, self.fluid)
-                
-                self.P_0 = P_curr
-                self.T_0 = T_curr
-                self.calc_thermo()
-                m_dot_curr = self.m_dot
-                self.canvas.axes_depress.scatter(i, P_curr)
-                print(f'P = {P_curr}, T = {T_curr}')
-                i+=1
-            else:
-                break
+
+        # while m_curr > 0:
+        #     phase = PhaseSI('P', P_curr, 'T', T_curr, self.fluid)
+        #     print(m_curr)
+        #     print(phase)
+        #     if phase == 'gas':
+        #         m_curr = m_curr - m_dot_curr * time_step
+        #         rho_curr = m_curr / V_curr
+        #         U_curr = U_curr - ((m_dot_curr * time_step) * (h_curr))
+        #         u_curr = U_curr / m_curr
+
+        #         try:
+        #             AS.update(CP.DmassUmass_INPUTS, rho_curr, u_curr)
+        #         except ValueError:
+        #             print(f'ValueError: Current density {rho_curr:.3g} is below triple')
+
+        #         T_curr = AS.T()   # K
+        #         P_curr = AS.p()   # Pa
+        #         #h_curr = AS.h()   # J/kg
+
+        #         # P_curr = PropsSI('P', 'T', T, 'D', rho_curr, self.fluid)
+        #         # T_curr = PropsSI('T', 'T', T, 'D', rho_curr, self.fluid)
+        #         h_curr = PropsSI('H', 'T', T_curr, 'D', rho_curr, self.fluid)
+
+        #         # P_curr = PropsSI('P', 'u', u_curr, 'D', rho_curr, self.fluid)
+        #         # T_curr = PropsSI('T', 'u', u_curr, 'D', rho_curr, self.fluid)
+        #         # h_curr = PropsSI('H', 'u', u_curr, 'D', rho_curr, self.fluid)
+
+        #         self.P_0 = P_curr
+        #         self.T_0 = T_curr
+        #         self.calc_thermo()
+        #         m_dot_curr = self.m_dot
+        #         self.canvas.axes_depress.scatter(i, P_curr)
+        #         QApplication.processEvents()
+        #         print(f'P = {P_curr}, T = {T_curr}')
+        #         i+=1
+        #     else:
+        #         break
             
     def calc_opt_geom(self):
         """
