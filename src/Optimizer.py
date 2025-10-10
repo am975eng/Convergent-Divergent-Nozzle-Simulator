@@ -1,6 +1,7 @@
 """
 Contains optimizer classes for use in other python scripts.
 """
+import numpy as np
 
 class ADAM_Optimizer:
     def __init__(self, learning_rate=0.01, beta_1=0.9, beta_2=0.999,

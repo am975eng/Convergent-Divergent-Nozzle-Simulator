@@ -27,6 +27,7 @@ import numpy as np
 from scipy.optimize import (
     fsolve,
     root_scalar)
+from CoolProp.CoolProp import PropsSI, PhaseSI
 
 import Aero_Thermo as AT
 import Method_Of_Char as MOC
@@ -43,17 +44,19 @@ class MplCanvas(FigureCanvas):
         Initializes the instance with a figure and subplot axes and sets 
         style properties.
         """
-        self.fig = Figure(figsize=(5, 9),constrained_layout=True)
+        self.fig = Figure(figsize=(9, 9),constrained_layout=True)
         self.fig.patch.set_alpha(0)
-        self.axes = self.fig.add_subplot(411)
-        self.axes_2 = self.fig.add_subplot(412)
-        self.axes_3 = self.fig.add_subplot(413)
-        self.axes_4 = self.fig.add_subplot(414)
+        self.axes = self.fig.add_subplot(321)
+        self.axes_press = self.fig.add_subplot(322)
+        self.axes_mass = self.fig.add_subplot(323)
+        self.axes_mach = self.fig.add_subplot(324)
+        self.axes_depress = self.fig.add_subplot(325)
+        self.axes_temp = self.fig.add_subplot(326)
 
         self.axes.grid(True)
         self.axes.title.set_color('white')
 
-        all_axes = [self.axes, self.axes_2, self.axes_3, self.axes_4]
+        all_axes = [self.axes, self.axes_press, self.axes_mass, self.axes_mach, self.axes_depress, self.axes_temp]
         for ax in all_axes:
             ax.set_facecolor('none')
             ax.spines['top'].set_color('white')
@@ -141,6 +144,10 @@ class MyWindow(QMainWindow):
         self.optimize_button = QPushButton("Optimize Geometry")
         self.optimize_button.clicked.connect(self.calc_opt_geom)
 
+        length_inlet_label = QLabel("Inlet Length [m]")
+        length_inlet_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.length_inlet_val = QLineEdit("0.1")
+        self.length_inlet_val.textChanged.connect(self._schedule_update)
         radius_inlet_label = QLabel("Inlet Radius [m]")
         radius_inlet_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.radius_inlet_val = QLineEdit("0.1")
@@ -160,6 +167,8 @@ class MyWindow(QMainWindow):
         thrust_design_label = QLabel("Design Thrust [N]")
         thrust_design_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.thrust_design_val = QLineEdit("100")
+        self.depress_button = QPushButton("Depressurize")
+        self.depress_button.clicked.connect(self.calc_depress)
 
         # Results Widgets
         results_label = QLabel("Result Summary")
@@ -208,12 +217,13 @@ class MyWindow(QMainWindow):
                       T_chamber_label, self.T_chamber_val, converg_label,
                       self.converg_ang_val, diverg_label,
                       self.diverg_angle_val, self.optimize_button)
-        add_to_layout(1, 1,radius_inlet_label, self.radius_inlet_val,
+        add_to_layout(1, 1, length_inlet_label, self.length_inlet_val, 
+                      radius_inlet_label, self.radius_inlet_val, 
                       self.radius_throat_label, self.radius_throat_val,
                       self.radius_exit_label, self.radius_exit_val,
                       M_exit_label, self.M_exit_val, P_amb_label,
                       self.P_amb_val, thrust_design_label,
-                      self.thrust_design_val)
+                      self.thrust_design_val, self.depress_button)
         v_spacer = QSpacerItem(
         20, 40,
         QSizePolicy.Policy.Minimum,   # Doesn’t expand sideways
@@ -250,16 +260,17 @@ class MyWindow(QMainWindow):
         self.update_result()
 
     def extract_UI_data(self):
-        if self.prop_list.currentText() == "Air":
+        self.fluid = self.prop_list.currentText()
+        if self.fluid == "Air":
             self.R_spec = 287
             self.k=1.4
-        elif self.prop_list.currentText() == "CO2":
+        elif self.fluid == "CO2":
             self.R_spec = 188.9
             self.k=1.289
-        elif self.prop_list.currentText() == "N2":
+        elif self.fluid == "N2":
             self.R_spec = 296.8
             self.k=1.4
-        elif self.prop_list.currentText() == "Xe":
+        elif self.fluid == "Xe":
             self.R_spec = 63.33
             self.k=1.667
 
@@ -280,6 +291,7 @@ class MyWindow(QMainWindow):
         self.r_outlet = float(self.radius_exit_val.text())
         self.converg_angle= np.deg2rad(float(self.converg_ang_val.text()))
         self.diverg_angle = np.deg2rad(float(self.diverg_angle_val.text()))
+        self.len_inlet = float(self.length_inlet_val.text())
 
     def calc_thermo(self):
         self.A_star = math.pi*(self.r_throat**2)
@@ -321,10 +333,10 @@ class MyWindow(QMainWindow):
             self.x_div = np.linspace(0, diverg_length, res)
             self.y_div = self.r_throat + self.x_div*np.tan(self.diverg_angle)
 
-        grey_out_style = """QLineEdit[readOnly="true"]""" + 
-            """ {background-color: #a3a3a3; color: white; }""" +
-            """QLineEdit[readOnly="false"]""" + 
-            """ { background-color: white; color: black; }"""
+        grey_out_style = """QLineEdit[readOnly="true"]
+            {background-color: #a3a3a3; color: white;}
+            QLineEdit[readOnly="false"]
+            { background-color: white; color: black;}"""
         self.converg_ang_val.setStyleSheet(grey_out_style)
         self.diverg_angle_val.setStyleSheet(grey_out_style)
         self.radius_exit_val.setStyleSheet(grey_out_style)
@@ -627,8 +639,14 @@ class MyWindow(QMainWindow):
                     linestyle=line.get_linestyle(),
                     linewidth=line.get_linewidth())
 
+        self.canvas.axes.plot([self.x_conv[0], self.x_conv[0]-self.len_inlet],
+                              [self.y_conv[0], self.y_conv[0]],
+                              'b-', linewidth=2)
+        self.canvas.axes.plot(
+            [self.x_conv[0]-self.len_inlet, self.x_conv[0]-self.len_inlet],
+            [self.y_conv[0], 0], 'b-', linewidth=2)
         self.canvas.axes.plot(self.x_conv, self.y_conv, 'b-', linewidth=2)
-        self.canvas.axes.plot(self.x_div, self.y_div, 'b-', linewidth=2)   
+        self.canvas.axes.plot(self.x_div, self.y_div, 'b-', linewidth=2)
         reflect_plot()
 
         def gen_cmap_plot(x,y,ax):
@@ -653,17 +671,17 @@ class MyWindow(QMainWindow):
             ax.set_ylim(np.min(y) - 0.1*span, np.max(y)+0.15*span)
  
         gen_cmap_plot(np.concatenate([self.x_conv, self.x_div]), self.P_array,
-                      self.canvas.axes_2)
+                      self.canvas.axes_press)
         gen_cmap_plot(np.concatenate([self.x_conv, self.x_div]), self.M_array,
-                      self.canvas.axes_3)
+                      self.canvas.axes_mach)
         gen_cmap_plot(np.concatenate([self.x_conv, self.x_div]), self.T_array,
-                      self.canvas.axes_4)
+                      self.canvas.axes_temp)
 
         self.canvas.axes.set_ylabel('Y Position [m]', color='white')
-        self.canvas.axes_2.set_ylabel('Pressure [Pa]', color='white')
-        self.canvas.axes_3.set_ylabel('Mach Number', color='white')
-        self.canvas.axes_4.set_ylabel('Temperature [K]', color='white')
-        self.canvas.axes_4.set_xlabel('X Position [m]', color='white')
+        self.canvas.axes_press.set_ylabel('Pressure [Pa]', color='white')
+        self.canvas.axes_mach.set_ylabel('Mach Number', color='white')
+        self.canvas.axes_temp.set_ylabel('Temperature [K]', color='white')
+        self.canvas.axes_temp.set_xlabel('X Position [m]', color='white')
 
         # Refresh canvas
         self.canvas.draw()
@@ -674,9 +692,9 @@ class MyWindow(QMainWindow):
         recalculates flow thermodynamics.
         """
         self.canvas.axes.clear()
-        self.canvas.axes_2.clear()
-        self.canvas.axes_3.clear()
-        self.canvas.axes_4.clear()
+        self.canvas.axes_press.clear()
+        self.canvas.axes_mach.clear()
+        self.canvas.axes_temp.clear()
 
         # Extract UI data
         self.extract_UI_data()
@@ -690,6 +708,44 @@ class MyWindow(QMainWindow):
         # Plot data
         self.plot_data()
 
+    def calc_depress(self):
+        P_curr = self.P_0
+        T_curr = self.T_0
+        m_dot_curr = self.m_dot
+        time_step = .0001
+
+        V_chamb = self.len_inlet * (np.pi * (self.r_inlet**2))
+        rho_chamb = PropsSI('D', 'P', P_curr, 'T', T_curr, self.fluid)
+        m_curr = V_chamb * rho_chamb
+        h_curr = PropsSI('H', 'T', T_curr, 'P', P_curr, self.fluid)
+        u_curr = PropsSI('U', 'T', T_curr, 'P', P_curr, self.fluid)
+        H_curr = h_curr * m_curr
+        U_curr = u_curr * m_curr
+        i = 0
+        while m_curr > 0:
+            phase = PhaseSI('P', P_curr, 'T', T_curr, self.fluid)
+            print(m_curr)
+            print(phase)
+            if phase == 'gas':
+                m_curr = m_curr - m_dot_curr * time_step
+                rho_curr = m_curr / V_chamb
+                U_curr = U_curr - ((m_dot_curr * time_step) * (h_curr))
+                u_curr = U_curr / m_curr
+                
+                P_curr = PropsSI('P', 'u', u_curr, 'D', rho_curr, self.fluid)
+                T_curr = PropsSI('T', 'u', u_curr, 'D', rho_curr, self.fluid)
+                h_curr = PropsSI('H', 'u', u_curr, 'D', rho_curr, self.fluid)
+                
+                self.P_0 = P_curr
+                self.T_0 = T_curr
+                self.calc_thermo()
+                m_dot_curr = self.m_dot
+                self.canvas.axes_depress.scatter(i, P_curr)
+                print(f'P = {P_curr}, T = {T_curr}')
+                i+=1
+            else:
+                break
+            
     def calc_opt_geom(self):
         """
         Calculates the optimal nozzle geometry using a gradient descent
