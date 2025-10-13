@@ -141,3 +141,19 @@ def calc_M_P_normal(M_1, P_1, k):
     M_2 = ((M_1**2 + (2/(k-1)))/((2*k/(k-1))*M_1*M_1-1))**0.5                    
     P_2 = P_1*(((2*k/(k+1))*M_1*M_1) - (k-1)/(k+1))                               
     return M_2, P_2
+
+def calc_ada_dPdT(P_0_init, tau, t, k):
+    dPdt = - (k * P_0_init / tau) * (1 + ((k - 1) / 2) * (t / tau))**((2 * k) / (1 - k) - 1)
+    return dPdt
+
+def calc_isotherm_dPdt(P_0_init, tau, t):
+    dPdt = - (P_0_init/tau) * np.exp(-t/tau)
+    return dPdt
+
+def calc_ada_drhodt(rho_0_init, tau, t, k):
+    drhodt = - (rho_0_init / tau) * ((1 + ((k-1)/2) * (t/tau))**((1 + k) / (1 - k)))
+    return drhodt
+
+def calc_isotherm_drhodt(rho_0_init, tau, t):
+    drhodt = - (rho_0_init / tau) * np.exp(-t/tau)
+    return drhodt

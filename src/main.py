@@ -680,7 +680,10 @@ class MyWindow(QMainWindow):
 
         self.canvas.axes.set_ylabel('Y Position [m]', color='white')
         self.canvas.axes_press.set_ylabel('Pressure [Pa]', color='white')
+        self.canvas.axes_mass.set_ylabel('Mass [kg]', color='white')
         self.canvas.axes_mach.set_ylabel('Mach Number', color='white')
+        self.canvas.axes_depress.set_ylabel('Pressure [Pa]', color='white')
+        self.canvas.axes_depress.set_xlabel('Time [s]', color='white')
         self.canvas.axes_temp.set_ylabel('Temperature [K]', color='white')
         self.canvas.axes_temp.set_xlabel('X Position [m]', color='white')
 
@@ -694,7 +697,9 @@ class MyWindow(QMainWindow):
         """
         self.canvas.axes.clear()
         self.canvas.axes_press.clear()
+        self.canvas.axes_mass.clear()
         self.canvas.axes_mach.clear()
+        self.canvas.axes_depress.clear()
         self.canvas.axes_temp.clear()
 
         # Extract UI data
@@ -710,79 +715,60 @@ class MyWindow(QMainWindow):
         self.plot_data()
 
     def calc_depress(self):
+        self.depress_button.setText("Calculating...")
+        QApplication.processEvents()
         m_dot_curr = self.m_dot
-        time_step = .0001
+        time_step = .00001
         t = 0
 
         # Initial Conditions
         P_0_init = self.P_0
         T_0_init = self.T_0
+        rho_0_init = PropsSI('D', 'P', P_0_init, 'T', T_0_init, self.fluid)
+        V_init = self.len_inlet * (np.pi * (self.r_inlet**2))
+        m_init = rho_0_init * V_init
         P_curr = self.P_0
         T_curr = self.T_0
-        V_curr = self.len_inlet * (np.pi * (self.r_inlet**2))
-        rho_curr = PropsSI('D', 'P', P_curr, 'T', T_curr, self.fluid)
-        m_curr = V_curr * rho_curr
-        h_curr = PropsSI('H', 'T', T_curr, 'P', P_curr, self.fluid)
-        u_curr = PropsSI('U', 'T', T_curr, 'P', P_curr, self.fluid)
-        H_curr = h_curr * m_curr
-        U_curr = u_curr * m_curr
-        C_d = 1
         
+        rho_curr = PropsSI('D', 'P', P_curr, 'T', T_curr, self.fluid)
+        m_curr = V_init * rho_curr
+        C_d = 1
+        P_depress_array = []
+        m_depress_array = []
+    
         AS = AbstractState("HEOS", self.fluid)
 
-        # Adiabatic Blowdown
-        while m_curr > 0:
-            t += time_step
-            m_curr = m_curr - m_dot_curr * time_step
-            c_0 = np.sqrt(self.k*self.R_spec * T_0_init)
-
-            exp = (self.k + 1) / (2 * self.k - 2)
-            tau = (V_curr / (C_d * self.A_star * c_0))*(((self.k+1)/2)**exp)
-            dPdt = - (self.k * P_0_init / tau) * (1 + ((self.k - 1) / 2) * (t / tau))**((2 * self.k) / (1 - self.k) - 1)
-            dP = dPdt * time_step
-            P_curr += dP
-            self.canvas.axes_depress.scatter(t, P_curr)
-            print(P_curr)
-            print(m_curr)
-
-        # while m_curr > 0:
-        #     phase = PhaseSI('P', P_curr, 'T', T_curr, self.fluid)
-        #     print(m_curr)
-        #     print(phase)
-        #     if phase == 'gas':
-        #         m_curr = m_curr - m_dot_curr * time_step
-        #         rho_curr = m_curr / V_curr
-        #         U_curr = U_curr - ((m_dot_curr * time_step) * (h_curr))
-        #         u_curr = U_curr / m_curr
-
-        #         try:
-        #             AS.update(CP.DmassUmass_INPUTS, rho_curr, u_curr)
-        #         except ValueError:
-        #             print(f'ValueError: Current density {rho_curr:.3g} is below triple')
-
-        #         T_curr = AS.T()   # K
-        #         P_curr = AS.p()   # Pa
-        #         #h_curr = AS.h()   # J/kg
-
-        #         # P_curr = PropsSI('P', 'T', T, 'D', rho_curr, self.fluid)
-        #         # T_curr = PropsSI('T', 'T', T, 'D', rho_curr, self.fluid)
-        #         h_curr = PropsSI('H', 'T', T_curr, 'D', rho_curr, self.fluid)
-
-        #         # P_curr = PropsSI('P', 'u', u_curr, 'D', rho_curr, self.fluid)
-        #         # T_curr = PropsSI('T', 'u', u_curr, 'D', rho_curr, self.fluid)
-        #         # h_curr = PropsSI('H', 'u', u_curr, 'D', rho_curr, self.fluid)
-
-        #         self.P_0 = P_curr
-        #         self.T_0 = T_curr
-        #         self.calc_thermo()
-        #         m_dot_curr = self.m_dot
-        #         self.canvas.axes_depress.scatter(i, P_curr)
-        #         QApplication.processEvents()
-        #         print(f'P = {P_curr}, T = {T_curr}')
-        #         i+=1
-        #     else:
-        #         break
+        c_0 = np.sqrt(self.k*self.R_spec * T_0_init)
+        exp = (self.k + 1) / (2 * self.k - 2)
+        tau = (V_init / (C_d * self.A_star * c_0))*(((self.k+1)/2)**exp)
             
+        # Isothermal Blowdown
+        while m_curr > m_init*0.01:
+            t += time_step
+            dPdt = AT.calc_isotherm_dPdt(P_0_init, tau, t)
+            drhodt = AT.calc_isotherm_drhodt(rho_0_init, tau, t)
+            dP = dPdt * time_step
+            drho = drhodt * time_step
+            P_curr += dP
+            rho_curr += drho
+            m_curr = rho_curr * V_init
+            P_depress_array.append(P_curr)
+            m_depress_array.append(m_curr)
+
+        P_depress_array = np.array(P_depress_array)
+        m_depress_array = np.array(m_depress_array)
+        t_depress_array = np.linspace(time_step, t, len(P_depress_array))
+
+        self.canvas.axes_depress.plot(t_depress_array, P_depress_array, 'g--')
+        self.canvas.axes_mass.plot(t_depress_array, m_depress_array, 'r--')   
+
+        # ada_P_array = P_0_init * ((1 + ((self.k-1)/2)*(t_array/tau)) ** (2 * self.k / (1 - self.k)))
+        # self.canvas.axes_depress.plot(t_array, ada_P_array,'b--', label='Adiabatic ')
+
+        self.depress_button.setText("Calculation Complete")
+        QApplication.processEvents()
+        self.canvas.draw()
+     
     def calc_opt_geom(self):
         """
         Calculates the optimal nozzle geometry using a gradient descent
