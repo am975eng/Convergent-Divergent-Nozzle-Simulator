@@ -27,7 +27,7 @@ import numpy as np
 from scipy.optimize import (
     fsolve,
     root_scalar)
-from CoolProp.CoolProp import PropsSI, PhaseSI, AbstractState
+from CoolProp.CoolProp import PropsSI, AbstractState
 import CoolProp.CoolProp as CP
 
 import Aero_Thermo as AT
@@ -47,17 +47,21 @@ class MplCanvas(FigureCanvas):
         """
         self.fig = Figure(figsize=(9, 9),constrained_layout=True)
         self.fig.patch.set_alpha(0)
-        self.axes = self.fig.add_subplot(321)
-        self.axes_press = self.fig.add_subplot(322)
-        self.axes_mass = self.fig.add_subplot(323)
-        self.axes_mach = self.fig.add_subplot(324)
-        self.axes_depress = self.fig.add_subplot(325)
-        self.axes_temp = self.fig.add_subplot(326)
+        self.axes = self.fig.add_subplot(421)
+        self.axes_mass = self.fig.add_subplot(422)
+        self.axes_press = self.fig.add_subplot(423)
+        self.axes_depress = self.fig.add_subplot(424)
+        self.axes_mach = self.fig.add_subplot(425)
+        self.axes_thrust = self.fig.add_subplot(426)
+        self.axes_temp = self.fig.add_subplot(427)
+        self.axes_detemp = self.fig.add_subplot(428)
 
         self.axes.grid(True)
         self.axes.title.set_color('white')
 
-        all_axes = [self.axes, self.axes_press, self.axes_mass, self.axes_mach, self.axes_depress, self.axes_temp]
+        all_axes = [self.axes, self.axes_mass, self.axes_press, 
+                    self.axes_depress, self.axes_mach, self.axes_thrust, 
+                    self.axes_temp, self.axes_detemp]
         for ax in all_axes:
             ax.set_facecolor('none')
             ax.spines['top'].set_color('white')
@@ -257,6 +261,19 @@ class MyWindow(QMainWindow):
 
         widget.setLayout(outer_layout)
         self.setCentralWidget(widget)
+
+        self.canvas.axes.set_title('Centerline Values', color='white', fontsize=10)
+        self.canvas.axes.set_ylabel('Y Position [m]', color='white')
+        self.canvas.axes_mass.set_title('Depressurization Values', color='white', fontsize=10)
+        self.canvas.axes_mass.set_ylabel('Mass [kg]', color='white')
+        self.canvas.axes_press.set_ylabel('Pressure [Pa]', color='white')
+        self.canvas.axes_depress.set_ylabel('Pressure [Pa]', color='white')
+        self.canvas.axes_mach.set_ylabel('Mach Number', color='white')
+        self.canvas.axes_thrust.set_ylabel('Thrust [N]', color='white')
+        self.canvas.axes_temp.set_ylabel('Temperature [K]', color='white')
+        self.canvas.axes_temp.set_xlabel('X Position [m]', color='white')
+        self.canvas.axes_detemp.set_ylabel('Temperature [K]', color='white')
+        self.canvas.axes_detemp.set_xlabel('Time [s]', color='white')
 
         self.update_result()
 
@@ -626,6 +643,9 @@ class MyWindow(QMainWindow):
             self.T_array[index] = T_x
 
     def plot_data(self):
+        """
+        Plots calculated data to relevant axes
+        """
         def reflect_plot():
             """
             Reflects the plot on the opposite side of the x-axis
@@ -639,17 +659,7 @@ class MyWindow(QMainWindow):
                     color=line.get_color(),
                     linestyle=line.get_linestyle(),
                     linewidth=line.get_linewidth())
-
-        self.canvas.axes.plot([self.x_conv[0], self.x_conv[0]-self.len_inlet],
-                              [self.y_conv[0], self.y_conv[0]],
-                              'b-', linewidth=2)
-        self.canvas.axes.plot(
-            [self.x_conv[0]-self.len_inlet, self.x_conv[0]-self.len_inlet],
-            [self.y_conv[0], 0], 'b-', linewidth=2)
-        self.canvas.axes.plot(self.x_conv, self.y_conv, 'b-', linewidth=2)
-        self.canvas.axes.plot(self.x_div, self.y_div, 'b-', linewidth=2)
-        reflect_plot()
-
+                
         def gen_cmap_plot(x,y,ax):
             """
             Generates a colormap plot of the given data.
@@ -665,27 +675,37 @@ class MyWindow(QMainWindow):
             norm = mpl_colors.Normalize(vmin=np.min(-y), vmax=np.max(-y))
             lc = LineCollection(segments, cmap=cmap, norm=norm, linewidth=1)
             lc.set_array(-y) 
-            
+
             ax.add_collection(lc)
             span = np.max(y) - np.min(y)
             ax.set_xlim(np.min(x), np.max(x))
             ax.set_ylim(np.min(y) - 0.1*span, np.max(y)+0.15*span)
  
+        for axes in [self.canvas.axes, self.canvas.axes_mass, 
+            self.canvas.axes_press, self.canvas.axes_depress,
+            self.canvas.axes_mach, self.canvas.axes_thrust,
+            self.canvas.axes_temp, self.canvas.axes_detemp]:
+            for line in axes.lines:
+                line.remove()
+            for collection in axes.collections:
+                collection.remove()
+
+        self.canvas.axes.plot([self.x_conv[0], self.x_conv[0]-self.len_inlet],
+                              [self.y_conv[0], self.y_conv[0]],
+                              'b-', linewidth=2)
+        self.canvas.axes.plot(
+            [self.x_conv[0]-self.len_inlet, self.x_conv[0]-self.len_inlet],
+            [self.y_conv[0], 0], 'b-', linewidth=2)
+        self.canvas.axes.plot(self.x_conv, self.y_conv, 'b-', linewidth=2)
+        self.canvas.axes.plot(self.x_div, self.y_div, 'b-', linewidth=2)
+        reflect_plot()
+
         gen_cmap_plot(np.concatenate([self.x_conv, self.x_div]), self.P_array,
                       self.canvas.axes_press)
         gen_cmap_plot(np.concatenate([self.x_conv, self.x_div]), self.M_array,
                       self.canvas.axes_mach)
         gen_cmap_plot(np.concatenate([self.x_conv, self.x_div]), self.T_array,
                       self.canvas.axes_temp)
-
-        self.canvas.axes.set_ylabel('Y Position [m]', color='white')
-        self.canvas.axes_press.set_ylabel('Pressure [Pa]', color='white')
-        self.canvas.axes_mass.set_ylabel('Mass [kg]', color='white')
-        self.canvas.axes_mach.set_ylabel('Mach Number', color='white')
-        self.canvas.axes_depress.set_ylabel('Pressure [Pa]', color='white')
-        self.canvas.axes_depress.set_xlabel('Time [s]', color='white')
-        self.canvas.axes_temp.set_ylabel('Temperature [K]', color='white')
-        self.canvas.axes_temp.set_xlabel('X Position [m]', color='white')
 
         # Refresh canvas
         self.canvas.draw()
@@ -695,12 +715,6 @@ class MyWindow(QMainWindow):
         Main function that gets triggered by a UI event. Extracts UI data and
         recalculates flow thermodynamics.
         """
-        self.canvas.axes.clear()
-        self.canvas.axes_press.clear()
-        self.canvas.axes_mass.clear()
-        self.canvas.axes_mach.clear()
-        self.canvas.axes_depress.clear()
-        self.canvas.axes_temp.clear()
 
         # Extract UI data
         self.extract_UI_data()
@@ -708,20 +722,16 @@ class MyWindow(QMainWindow):
         # Thermodynamics
         self.calc_thermo()     
 
-        # Load styles
-        #self.load_styles()
-
         # Plot data
         self.plot_data()
 
     def calc_depress(self):
         self.depress_button.setText("Calculating...")
-        QApplication.processEvents()
-        m_dot_curr = self.m_dot
-        time_step = .00001
-        t = 0
+        self.extract_UI_data()
 
         # Initial Conditions
+        time_step = .00001
+        t = 0
         P_0_init = self.P_0
         T_0_init = self.T_0
         rho_0_init = PropsSI('D', 'P', P_0_init, 'T', T_0_init, self.fluid)
@@ -729,19 +739,24 @@ class MyWindow(QMainWindow):
         m_init = rho_0_init * V_init
         P_curr = self.P_0
         T_curr = self.T_0
-        
         rho_curr = PropsSI('D', 'P', P_curr, 'T', T_curr, self.fluid)
         m_curr = V_init * rho_curr
         C_d = 1
+        
         P_depress_array = []
         m_depress_array = []
-    
+        thr_depress_array = []
+        temp_depress_array = []
+
         AS = AbstractState("HEOS", self.fluid)
 
         c_0 = np.sqrt(self.k*self.R_spec * T_0_init)
         exp = (self.k + 1) / (2 * self.k - 2)
         tau = (V_init / (C_d * self.A_star * c_0))*(((self.k+1)/2)**exp)
-            
+        decay_time = 4.61 * tau         # Time until 1 percent remaining
+        if decay_time/1000 > time_step: # Check if timestep too small
+            time_step = decay_time/1000
+
         # Isothermal Blowdown
         while m_curr > m_init*0.01:
             t += time_step
@@ -754,16 +769,22 @@ class MyWindow(QMainWindow):
             m_curr = rho_curr * V_init
             P_depress_array.append(P_curr)
             m_depress_array.append(m_curr)
+            temp_depress_array.append(T_curr)
+
+            self.P_0 = P_curr
+            self.calc_thermo()
+            thr_depress_array.append(self.thr)
+            QApplication.processEvents()
 
         P_depress_array = np.array(P_depress_array)
         m_depress_array = np.array(m_depress_array)
+        thr_depress_array = np.array(thr_depress_array)
         t_depress_array = np.linspace(time_step, t, len(P_depress_array))
 
-        self.canvas.axes_depress.plot(t_depress_array, P_depress_array, 'g--')
-        self.canvas.axes_mass.plot(t_depress_array, m_depress_array, 'r--')   
-
-        # ada_P_array = P_0_init * ((1 + ((self.k-1)/2)*(t_array/tau)) ** (2 * self.k / (1 - self.k)))
-        # self.canvas.axes_depress.plot(t_array, ada_P_array,'b--', label='Adiabatic ')
+        self.canvas.axes_depress.plot(t_depress_array, P_depress_array, 'g-')
+        self.canvas.axes_mass.plot(t_depress_array, m_depress_array, 'r-')
+        self.canvas.axes_thrust.plot(t_depress_array, thr_depress_array, 'b-')   
+        self.canvas.axes_detemp.plot(t_depress_array, temp_depress_array, 'w-')
 
         self.depress_button.setText("Calculation Complete")
         QApplication.processEvents()
@@ -775,6 +796,7 @@ class MyWindow(QMainWindow):
         algorithm with an ADAM optimizer to match design thrust.
         """
 
+        self.extract_UI_data()
         max_iterations=1000
         thr_design = float(self.thrust_design_val.text())
         area_ratio_outlet = self.A_outlet / self.A_star
