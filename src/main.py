@@ -134,10 +134,6 @@ class MyWindow(QMainWindow):
         T_chamber_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.T_chamber_val = QLineEdit("293.15")
         self.T_chamber_val.textChanged.connect(self._schedule_update)
-        P_amb_label = QLabel("Ambient Pressure [Pa]")
-        P_amb_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.P_amb_val = QLineEdit("0")
-        self.P_amb_val.textChanged.connect(self._schedule_update)
         converg_label = QLabel("Convergence Angle [Deg]")
         converg_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.converg_ang_val = QLineEdit("45")
@@ -146,6 +142,9 @@ class MyWindow(QMainWindow):
         diverg_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.diverg_angle_val = QLineEdit("15")
         self.diverg_angle_val.textChanged.connect(self._schedule_update)
+        thrust_design_label = QLabel("Design Thrust [N]")
+        thrust_design_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.thrust_design_val = QLineEdit("100")
         self.optimize_button = QPushButton("Optimize Geometry")
         self.optimize_button.clicked.connect(self.calc_opt_geom)
 
@@ -169,9 +168,14 @@ class MyWindow(QMainWindow):
         M_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.M_exit_val = QLineEdit("2.0")
         self.M_exit_val.textChanged.connect(self._schedule_update)
-        thrust_design_label = QLabel("Design Thrust [N]")
-        thrust_design_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.thrust_design_val = QLineEdit("100")
+        P_amb_label = QLabel("Ambient Pressure [Pa]")
+        P_amb_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.P_amb_val = QLineEdit("0")
+        self.P_amb_val.textChanged.connect(self._schedule_update)
+        depress_type = QLabel("Depressurization Type")
+        depress_type.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.depress_type_list = QComboBox()
+        self.depress_type_list.addItems(["Isothermal", "Adiabatic"])
         self.depress_button = QPushButton("Depressurize")
         self.depress_button.clicked.connect(self.calc_depress)
 
@@ -203,6 +207,14 @@ class MyWindow(QMainWindow):
         P_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.P_exit_val = QLabel(" ")
         self.P_exit_val.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        m_prop_label = QLabel("Propellant Mass [kg]")
+        m_prop_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.m_prop_val = QLabel(" ")
+        self.m_prop_val.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        expansion_ratio_label = QLabel("Expansion Ratio")
+        expansion_ratio_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.expansion_ratio_val = QLabel(" ")
+        self.expansion_ratio_val.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         ISP_label = QLabel("Specific Impulse [s]")
         ISP_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.ISP_val = QLabel(" ")
@@ -221,14 +233,15 @@ class MyWindow(QMainWindow):
                       self.noz_type_list, P_chamber_label, self.P_chamber_val,
                       T_chamber_label, self.T_chamber_val, converg_label,
                       self.converg_ang_val, diverg_label,
-                      self.diverg_angle_val, self.optimize_button)
+                      self.diverg_angle_val, thrust_design_label,
+                      self.thrust_design_val, self.optimize_button)
         add_to_layout(1, 1, length_inlet_label, self.length_inlet_val, 
                       radius_inlet_label, self.radius_inlet_val, 
                       self.radius_throat_label, self.radius_throat_val,
                       self.radius_exit_label, self.radius_exit_val,
                       M_exit_label, self.M_exit_val, P_amb_label,
-                      self.P_amb_val, thrust_design_label,
-                      self.thrust_design_val, self.depress_button)
+                      self.P_amb_val, depress_type, self.depress_type_list,
+                      self.depress_button)
         v_spacer = QSpacerItem(
         20, 40,
         QSizePolicy.Policy.Minimum,   # Doesn’t expand sideways
@@ -244,11 +257,12 @@ class MyWindow(QMainWindow):
         option_layout.addWidget(results_label, 17, 0)
         option_layout.addWidget(self.result_display_label, 18, 0, 1, 2)
         add_to_layout(0,19, P_e_sup_label, self.P_e_sup_val, P_e_shock_label,
-                      self.P_e_shock_val, m_dot_label, self.m_dot_val,
-                      ISP_label, self.ISP_val)
+                      self.P_e_shock_val, m_dot_label, self.m_dot_val, 
+                      m_prop_label, self.m_prop_val,ISP_label, self.ISP_val)
         add_to_layout(1,19, P_e_sub_label, self.P_e_sub_val,
                       P_star_shock_label, self.P_star_shock_val, P_exit_label,
-                      self.P_exit_val, thrust_label, self.thrust_val)
+                      self.P_exit_val, expansion_ratio_label,
+                      self.expansion_ratio_val, thrust_label, self.thrust_val)
 
         graphic_layout = QVBoxLayout()
         self.canvas = MplCanvas(self)
@@ -262,9 +276,11 @@ class MyWindow(QMainWindow):
         widget.setLayout(outer_layout)
         self.setCentralWidget(widget)
 
-        self.canvas.axes.set_title('Centerline Values', color='white', fontsize=10)
+        self.canvas.axes.set_title('Centerline Values', color='white', 
+                                   fontsize=10)
         self.canvas.axes.set_ylabel('Y Position [m]', color='white')
-        self.canvas.axes_mass.set_title('Depressurization Values', color='white', fontsize=10)
+        self.canvas.axes_mass.set_title('Depressurization Values',
+                                        color='white', fontsize=10)
         self.canvas.axes_mass.set_ylabel('Mass [kg]', color='white')
         self.canvas.axes_press.set_ylabel('Pressure [Pa]', color='white')
         self.canvas.axes_depress.set_ylabel('Pressure [Pa]', color='white')
@@ -481,8 +497,8 @@ class MyWindow(QMainWindow):
                     self.T_array[shift] = T_x
 
             elif self.P_amb > P_e_shock:
-                # Back pressure is low enough for choked supersonic flow with
-                # possible normal shock
+                """Back pressure is low enough for choked supersonic flow with
+                possible normal shock"""
                 for index in range(len(self.x_div)):
                     A_x = math.pi*(self.y_div[index]**2)
                     shift = index + len(self.x_conv)
@@ -621,9 +637,15 @@ class MyWindow(QMainWindow):
             self.thr = self.m_dot * V_e + (
                 self.P_e - self.P_amb) * self.A_outlet
             self.ISP = self.thr/(self.m_dot*9.81)
+            self.expansion_ratio = self.A_outlet/self.A_star
+            rho_0 = PropsSI('D', 'P', self.P_0, 'T', self.T_0, self.fluid)
+            V_0 = self.len_inlet * (np.pi * (self.r_inlet**2))
+            self.m_prop = rho_0 * V_0 
 
             self.m_dot_val.setText(f"{self.m_dot:.3g}")
             self.P_exit_val.setText(f"{self.P_e:.3g}")
+            self.expansion_ratio_val.setText(f"{self.expansion_ratio:.3g}")
+            self.m_prop_val.setText(f"{self.m_prop:.3g}")
             self.ISP_val.setText(f"{self.ISP:.3g}")
             self.thrust_val.setText(f"{self.thr:.3g}")
 
@@ -726,8 +748,14 @@ class MyWindow(QMainWindow):
         self.plot_data()
 
     def calc_depress(self):
-        self.depress_button.setText("Calculating...")
+        """
+        Calculates flow properties during isothermal or adiabatic
+        depressurization. Assumes choked flow and uses derivative eqns. with
+        Euler's method.
+        """
+        self.depress_button.setText("Calculating...")   
         self.extract_UI_data()
+        self.plot_data()
 
         # Initial Conditions
         time_step = .00001
@@ -757,15 +785,31 @@ class MyWindow(QMainWindow):
         if decay_time/1000 > time_step: # Check if timestep too small
             time_step = decay_time/1000
 
-        # Isothermal Blowdown
-        while m_curr > m_init*0.01:
+        if self.depress_type_list.currentIndex() == 0:
+            calc_dPdt = lambda P, tau, t: AT.calc_isotherm_dPdt(P, tau, t)
+            calc_drhodt = lambda rho, tau, t: AT.calc_isotherm_drhodt(
+                rho, tau, t)
+            calc_dTdt = lambda T, tau, t: 0
+        elif self.depress_type_list.currentIndex() == 1:
+            calc_dPdt = lambda P, tau, t: AT.calc_ada_dPdT(P, tau, t, self.k)
+            calc_drhodt = lambda rho, tau, t: AT.calc_ada_drhodt(
+                rho, tau, t, self.k)
+            calc_dTdt = lambda T, tau, t: AT.calc_ada_dTdt(T, tau, t, self.k)
+
+        # Main depressurization loop
+        while m_curr > m_init*0.01 and t < decay_time:
             t += time_step
-            dPdt = AT.calc_isotherm_dPdt(P_0_init, tau, t)
-            drhodt = AT.calc_isotherm_drhodt(rho_0_init, tau, t)
+            dPdt = calc_dPdt(P_0_init, tau, t)
+            drhodt = calc_drhodt(rho_0_init, tau, t)
+            dTdt = calc_dTdt(T_0_init, tau, t)
+
             dP = dPdt * time_step
             drho = drhodt * time_step
+            dT = dTdt * time_step
+
             P_curr += dP
             rho_curr += drho
+            T_curr += dT
             m_curr = rho_curr * V_init
             P_depress_array.append(P_curr)
             m_depress_array.append(m_curr)
@@ -789,7 +833,7 @@ class MyWindow(QMainWindow):
         self.depress_button.setText("Calculation Complete")
         QApplication.processEvents()
         self.canvas.draw()
-     
+
     def calc_opt_geom(self):
         """
         Calculates the optimal nozzle geometry using a gradient descent

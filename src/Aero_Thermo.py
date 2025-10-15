@@ -157,3 +157,7 @@ def calc_ada_drhodt(rho_0_init, tau, t, k):
 def calc_isotherm_drhodt(rho_0_init, tau, t):
     drhodt = - (rho_0_init / tau) * np.exp(-t/tau)
     return drhodt
+
+def calc_ada_dTdt(T_0_init, tau, t, k):
+    dTdt = - T_0_init * ((k-1)/tau) * ((1 + ((k-1)/2) * (t/tau))**-3)
+    return dTdt
