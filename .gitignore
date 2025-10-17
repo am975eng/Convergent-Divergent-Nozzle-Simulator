@@ -1,6 +1,6 @@
 mod_venv/
 src/Test.py
 .vscode/
-src/__pycache__/
+__pycache__/
 src/profile.html
 src/profile.json
