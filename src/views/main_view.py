@@ -7,6 +7,10 @@ from dataclasses import dataclass
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas)
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+from matplotlib import colors as mpl_colors
+from matplotlib.collections import LineCollection
+
 from pathlib import Path
 import numpy as np
 
@@ -28,7 +32,7 @@ class UIInputs:
     converg_angle: float
     diverg_angle: float
     len_inlet: float
-    M_exit: float
+    M_exit_moc: float
     thr_design: float
     noz_type: str
 
@@ -57,6 +61,9 @@ class MainWindow(QMainWindow):
             print("Style file not found. Using default styling.")
         except Exception as e:
             print(f"Error loading styles: {e}")
+
+    def show_busy(self, state):
+        pass
 
     def init_UI(self):
         """Sets up UI by creating and positioning widgets."""
@@ -143,8 +150,8 @@ class MainWindow(QMainWindow):
         self.m_dot_val.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         P_exit_label = QLabel("Exit Pressure [Pa]")
         P_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.P_exit_val = QLabel(" ")
-        self.P_exit_val.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.P_e_val = QLabel(" ")
+        self.P_e_val.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         m_prop_label = QLabel("Propellant Mass [kg]")
         m_prop_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.m_prop_val = QLabel(" ")
@@ -199,7 +206,7 @@ class MainWindow(QMainWindow):
                       m_prop_label, self.m_prop_val,ISP_label, self.ISP_val)
         add_to_layout(1,19, P_e_sub_label, self.P_e_sub_val,
                       P_star_shock_label, self.P_star_shock_val, P_exit_label,
-                      self.P_exit_val, expansion_ratio_label,
+                      self.P_e_val, expansion_ratio_label,
                       self.expansion_ratio_val, thrust_label, self.thrust_val)
 
         graphic_layout = QVBoxLayout()
@@ -263,15 +270,110 @@ class MainWindow(QMainWindow):
         diverg_angle = np.deg2rad(float(self.diverg_angle_val.text()))
         len_inlet = float(self.length_inlet_val.text())
 
-        M_exit = float(self.M_exit_val.text())
+        M_exit_moc = float(self.M_exit_val.text())
         thr_design = float(self.thrust_design_val.text())
 
         noz_type = self.noz_type_list.currentText()
 
         return UIInputs(fluid, R_spec, k, T_0, P_0, rho_0, P_amb, T_star,
                         P_star, M_star, r_throat, r_inlet, r_outlet,
-                        converg_angle, diverg_angle, len_inlet, M_exit,
+                        converg_angle, diverg_angle, len_inlet, M_exit_moc,
                         thr_design, noz_type)
+
+    def plot_data(self, UI_input, flow_result):
+        def reflect_plot(axes):
+            """
+            Reflects the plot on the opposite side of the x-axis
+            """
+            lines = axes.get_lines()
+            for line in lines:
+                x_data = line.get_xdata()
+                y_data = line.get_ydata()
+
+                axes.plot(x_data, -y_data,
+                    color=line.get_color(),
+                    linestyle=line.get_linestyle(),
+                    linewidth=line.get_linewidth())
+                
+        def gen_cmap_plot(x,y,ax):
+            """
+            Generates a colormap plot of the given data.
+
+            Inputs:
+                x (numpy array) - X-axis data
+                y (numpy array) - Y-axis data
+                ax (matplotlib axis) - Axis to plot on
+            """
+            points = np.array([x, y]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            cmap = plt.cm.RdYlBu 
+            norm = mpl_colors.Normalize(vmin=np.min(-y), vmax=np.max(-y))
+            lc = LineCollection(segments, cmap=cmap, norm=norm, linewidth=1)
+            lc.set_array(-y) 
+
+            ax.add_collection(lc)
+            span = np.max(y) - np.min(y)
+            ax.set_xlim(np.min(x), np.max(x))
+            ax.set_ylim(np.min(y) - 0.1*span, np.max(y)+0.15*span)
+ 
+        for axes in [self.canvas.axes, self.canvas.axes_mass, 
+            self.canvas.axes_press, self.canvas.axes_depress,
+            self.canvas.axes_mach, self.canvas.axes_thrust,
+            self.canvas.axes_temp, self.canvas.axes_detemp]:
+            for line in axes.lines:
+                line.remove()
+            for collection in axes.collections:
+                collection.remove()
+
+        self.canvas.axes.plot(
+            [flow_result.x_conv[0], flow_result.x_conv[0] - UI_input.len_inlet],
+            [flow_result.y_conv[0], flow_result.y_conv[0]], 'b-', linewidth=2)
+        self.canvas.axes.plot(
+            [flow_result.x_conv[0] - UI_input.len_inlet,
+             flow_result.x_conv[0] - UI_input.len_inlet],
+            [flow_result.y_conv[0], 0], 'b-', linewidth=2)
+        self.canvas.axes.plot(flow_result.x_conv, flow_result.y_conv, 'b-',
+                              linewidth=2)
+        self.canvas.axes.plot(flow_result.x_div, flow_result.y_div, 'b-',
+                              linewidth=2)
+
+        gen_cmap_plot(np.concatenate([flow_result.x_conv, flow_result.x_div]),
+                      flow_result.P_array, self.canvas.axes_press)
+        gen_cmap_plot(np.concatenate([flow_result.x_conv, flow_result.x_div]),
+                      flow_result.M_array, self.canvas.axes_mach)
+        gen_cmap_plot(np.concatenate([flow_result.x_conv, flow_result.x_div]),
+                      flow_result.T_array, self.canvas.axes_temp)
+        
+        # Shock effect
+        if flow_result.x_under_shock[0] is not None:
+            for i in range(len(flow_result.x_under_shock[1])):
+                self.canvas.axes.plot([flow_result.x_under_shock[0],
+                                       flow_result.x_under_shock[1][i]],
+                                      [flow_result.y_under_shock[0],
+                                       flow_result.y_under_shock[1][i]], 'g-')
+        elif flow_result.x_over_shock[0] is not None:
+            self.canvas.axes.plot(flow_result.x_over_shock,
+                                  flow_result.y_over_shock, 'r-')
+            
+        reflect_plot(self.canvas.axes)
+
+        # Result Section
+        self.result_display_label.setText(flow_result.result_display)
+        self.P_e_sup_val.setText('{:.3g}'.format(flow_result.P_e_sup))
+        self.P_e_sub_val.setText('{:.3g}'.format(flow_result.P_e_sub))
+        self.P_e_shock_val.setText('{:.3g}'.format(flow_result.P_e_shock))
+        self.P_star_shock_val.setText(
+            '{:.3g}'.format(flow_result.P_star_shock))
+        self.m_dot_val.setText('{:.3g}'.format(flow_result.m_dot))
+        self.P_e_val.setText('{:.3g}'.format(flow_result.P_e))
+        self.m_prop_val.setText('{:.3g}'.format(flow_result.m_prop))
+        self.expansion_ratio_val.setText(
+            '{:.3g}'.format(flow_result.expansion_ratio))
+        self.ISP_val.setText('{:.3g}'.format(flow_result.ISP))
+        self.thrust_val.setText('{:.3g}'.format(flow_result.thr))
+
+        # Refresh canvas
+        self.canvas.draw()
 
 
 class MplCanvas(FigureCanvas):
