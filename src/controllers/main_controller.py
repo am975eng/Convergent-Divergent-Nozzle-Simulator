@@ -1,8 +1,9 @@
-from PyQt6.QtCore import QTimer, QThreadPool
+from PyQt6.QtCore import QTimer, QThreadPool, QObject
 from workers import Worker
 
-class ThrusterController:
+class ThrusterController(QObject):
     def __init__(self, view, model):
+        super().__init__()
         self.view = view
         self.model = model
         self.threadpool = QThreadPool()
@@ -52,25 +53,22 @@ class ThrusterController:
         self.view.show_error(msg)
         self.view.show_busy(False)
     
-    def on_results_ready(self, UI_input, flow_result):
+    def on_results_ready(self, result):
+        print("Results ready")
+        UI_input = result[0]
+        flow_result = result[1]
         self.view.plot_data(UI_input, flow_result)
         self.view.show_busy(False)
 
     def optimize_geom(self):
         UI_input = self.view.extract_UI_data()
-        thermo_worker = Worker(self.model.calc_thermo, UI_input)
-        thermo_worker.signals.result.connect(self.on_thermo_ready)
-        thermo_worker.signals.finished.connect(lambda: print("Thermo done"))
-        self.threadpool.start(thermo_worker)
-
-    def on_thermo_ready(self, UI_input, flow_result):
+        result = self.model.calc_thermo(UI_input)
+        UI_input = result[0]
+        flow_result = result[1]
         opt_worker = Worker(self.model.calc_opt_geom, UI_input, flow_result, 1000, 1E-3)
-        opt_worker.signals.result.connect(self.on_opt_done)
+        opt_worker.signals.progress.connect(self.on_results_ready)
         opt_worker.signals.finished.connect(lambda: print("Optimization finished"))
         self.threadpool.start(opt_worker)
-
-    def on_opt_done(self):
-        pass
 
     def calc_depress(self):
         pass

@@ -315,6 +315,8 @@ class MainWindow(QMainWindow):
             span = np.max(y) - np.min(y)
             ax.set_xlim(np.min(x), np.max(x))
             ax.set_ylim(np.min(y) - 0.1*span, np.max(y)+0.15*span)
+
+        print("Plotting data...")
  
         for axes in [self.canvas.axes, self.canvas.axes_mass, 
             self.canvas.axes_press, self.canvas.axes_depress,
@@ -373,7 +375,7 @@ class MainWindow(QMainWindow):
         self.thrust_val.setText('{:.3g}'.format(flow_result.thr))
 
         # Refresh canvas
-        self.canvas.draw()
+        self.canvas.draw_idle()
 
 
 class MplCanvas(FigureCanvas):

@@ -2,7 +2,7 @@ import sys
 from views.main_view import MainWindow
 from models.thruster import ThrusterModel
 from controllers.main_controller import ThrusterController
-from PyQt6.QtWidgets import (QApplication)
+from PyQt6.QtWidgets import QApplication
 
 
 app = QApplication(sys.argv)

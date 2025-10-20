@@ -8,6 +8,7 @@ from scipy.optimize import (
     fsolve,
     root_scalar)
 from CoolProp.CoolProp import PropsSI, AbstractState
+import time 
 
 @dataclass
 class FlowResults:
@@ -351,10 +352,10 @@ class ThrusterModel():
                                   result_display, x_under_shock, y_under_shock,
                                   x_over_shock, y_over_shock)
 
-        return flow_result
+        return UI_input, flow_result
     
     def calc_opt_geom(self, UI_input, flow_result, max_iterations=1000,
-                      learning_rate=1E-3):
+                      learning_rate=1E-3, progress_callback=None):
         """
         Calculates the optimal nozzle geometry using a gradient descent
         algorithm with an ADAM optimizer to match design thrust.
@@ -375,9 +376,10 @@ class ThrusterModel():
             Returns:
                 (float) - Cost function
             """
-            flow_result = self.calc_thermo(UI_input)
+            result = self.calc_thermo(UI_input)
+            flow_result = result[1]
             thr_curr = flow_result.thr
-            return (thr_curr - UI_input.thr_design)**2
+            return (thr_curr - UI_input.thr_design)**2, flow_result
 
         def calc_gradient(UI_input, delta=.0001):
             """
@@ -395,25 +397,26 @@ class ThrusterModel():
             UI_input.r_outlet = ((UI_input.r_throat**2) * area_ratio_outlet)**0.5
             UI_input.r_inlet = ((UI_input.r_throat**2) * area_ratio_inlet)**0.5
             
-            cost_plus = calc_cost(UI_input)
+            cost_plus, flow_result_plus = calc_cost(UI_input)
             UI_input.r_throat -= delta
             UI_input.r_outlet = ((UI_input.r_throat**2) * area_ratio_outlet)**0.5
             UI_input.r_inlet = ((UI_input.r_throat**2) * area_ratio_inlet)**0.5
-            cost_minus = calc_cost(UI_input)
+            cost_minus, flow_result_minus = calc_cost(UI_input)
             return (cost_plus - cost_minus) / (2*delta)            
 
         for iteration in range(max_iterations):
-            print(iteration)
-            cost_curr = calc_cost(UI_input)
-            print(cost_curr)
-
+            time.sleep(0.1)
+            cost_curr, flow_result = calc_cost(UI_input)
+            
             if abs(cost_curr) < tol:
-                break
+                return (UI_input, flow_result)
 
             gradient = calc_gradient(UI_input)
-            print(gradient)
             update = optimizer.update(gradient)
-            print(update)
+
+            if iteration % 2 == 0:
+                print(iteration)
+                yield (UI_input, flow_result)
 
             UI_input.r_throat -= update
             UI_input.r_outlet = ((UI_input.r_throat**2) * area_ratio_outlet)**0.5
@@ -423,7 +426,7 @@ class ThrusterModel():
             print(f"Convergence failed after {max_iterations:.0f} iterations")
 
 
-    def calc_depress(self, UI_input, flow_result):
+    def calc_depress(self, UI_input, flow_result, time_step = 0.00001):
         """
         Calculates flow properties during isothermal or adiabatic
         depressurization. Assumes choked flow and uses derivative eqns. with
@@ -431,7 +434,6 @@ class ThrusterModel():
         """
 
         # Initial Conditions
-        time_step = .00001
         t = 0
         UI_input.P_0_init = UI_input.P_0
         UI_input.T_0_init = UI_input.T_0
@@ -490,8 +492,8 @@ class ThrusterModel():
             temp_depress_array.append(T_curr)
 
             UI_input.P_0 = P_curr
-            calc_thermo()
-            thr_depress_array.append(thr)
+            UI_input, flow_result = self.calc_thermo(UI_input)
+            thr_depress_array.append(flow_result.thr)
             QApplication.processEvents()
 
         P_depress_array = np.array(P_depress_array)
