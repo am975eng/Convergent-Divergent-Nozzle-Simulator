@@ -217,8 +217,9 @@ class ThrusterModel():
                         bracket=[0.0001,1], 
                         args=(UI_input.M_star, A_outlet,
                                 A_star_shock, UI_input.k)).root   
-                    P_y_e = AT.calc_isen_press(M_y_e, UI_input.P_0_y, UI_input.k)
-                    T_y_e = UI_input.T_0_y * ((1+((UI_input.k-1)/2)*M_y_e*M_y_e)
+                    P_y_e = AT.calc_isen_press(
+                        M_y_e, UI_input.P_0_y, UI_input.k)
+                    T_y_e = UI_input.T_0_y * ((1 + ((UI_input.k - 1) / 2) * M_y_e * M_y_e)
                                             **-1)
 
                     if abs((P_y_e - UI_input.P_amb)/P_y_e) < 0.1:
@@ -394,39 +395,46 @@ class ThrusterModel():
                 (float) - Gradient of thrust with respect to throat radius
             """
             UI_input.r_throat += delta
-            UI_input.r_outlet = ((UI_input.r_throat**2) * area_ratio_outlet)**0.5
-            UI_input.r_inlet = ((UI_input.r_throat**2) * area_ratio_inlet)**0.5
+            UI_input.r_outlet = (
+                (UI_input.r_throat**2) * area_ratio_outlet)**0.5
+            UI_input.r_inlet = (
+                (UI_input.r_throat**2) * area_ratio_inlet)**0.5
             
             cost_plus, flow_result_plus = calc_cost(UI_input)
             UI_input.r_throat -= delta
-            UI_input.r_outlet = ((UI_input.r_throat**2) * area_ratio_outlet)**0.5
-            UI_input.r_inlet = ((UI_input.r_throat**2) * area_ratio_inlet)**0.5
+            UI_input.r_outlet = (
+                (UI_input.r_throat**2) * area_ratio_outlet)**0.5
+            UI_input.r_inlet = (
+                (UI_input.r_throat**2) * area_ratio_inlet)**0.5
             cost_minus, flow_result_minus = calc_cost(UI_input)
             return (cost_plus - cost_minus) / (2*delta)            
 
         for iteration in range(max_iterations):
-            time.sleep(0.1)
+            time.sleep(0.25)
             cost_curr, flow_result = calc_cost(UI_input)
             
             if abs(cost_curr) < tol:
-                return (UI_input, flow_result)
+                print(f"Convergence achieved after {iteration:.0f} iterations")
+                return UI_input, flow_result
 
             gradient = calc_gradient(UI_input)
             update = optimizer.update(gradient)
 
             if iteration % 2 == 0:
-                print(iteration)
-                yield (UI_input, flow_result)
+                yield UI_input, flow_result
 
             UI_input.r_throat -= update
-            UI_input.r_outlet = ((UI_input.r_throat**2) * area_ratio_outlet)**0.5
-            UI_input.r_inlet = ((UI_input.r_throat**2) * area_ratio_inlet)**0.5
+            UI_input.r_outlet = (
+                (UI_input.r_throat**2) * area_ratio_outlet)**0.5
+            UI_input.r_inlet = (
+                (UI_input.r_throat**2) * area_ratio_inlet)**0.5
 
         else:
             print(f"Convergence failed after {max_iterations:.0f} iterations")
 
 
-    def calc_depress(self, UI_input, flow_result, time_step = 0.00001):
+    def calc_depress(self, UI_input, flow_result, time_step = 0.00001,
+                     progress_callback=None):
         """
         Calculates flow properties during isothermal or adiabatic
         depressurization. Assumes choked flow and uses derivative eqns. with
@@ -435,6 +443,7 @@ class ThrusterModel():
 
         # Initial Conditions
         t = 0
+        i = 0
         UI_input.P_0_init = UI_input.P_0
         UI_input.T_0_init = UI_input.T_0
         UI_input.rho_0_init = PropsSI('D', 'P', UI_input.P_0_init, 'T',
@@ -445,8 +454,11 @@ class ThrusterModel():
         T_curr = UI_input.T_0
         rho_curr = PropsSI('D', 'P', P_curr, 'T', T_curr, UI_input.fluid)
         m_curr = V_init * rho_curr
+        A_star = math.pi*(UI_input.r_throat**2)
+        A_inlet = math.pi*(UI_input.r_inlet**2)
+        A_outlet = math.pi*(UI_input.r_outlet**2)
         C_d = 1
-        
+
         P_depress_array = []
         m_depress_array = []
         thr_depress_array = []
@@ -461,12 +473,12 @@ class ThrusterModel():
         if decay_time/1000 > time_step: # Check if timestep too small
             time_step = decay_time/1000
 
-        if depress_type_list.currentIndex() == 0:
+        if UI_input.depress_type == "Isothermal":
             calc_dPdt = lambda P, tau, t: AT.calc_isotherm_dPdt(P, tau, t)
             calc_drhodt = lambda rho, tau, t: AT.calc_isotherm_drhodt(
                 rho, tau, t)
             calc_dTdt = lambda T, tau, t: 0
-        elif depress_type_list.currentIndex() == 1:
+        elif UI_input.depress_type == "Adiabatic":
             calc_dPdt = lambda P, tau, t: AT.calc_ada_dPdT(P, tau, t, UI_input.k)
             calc_drhodt = lambda rho, tau, t: AT.calc_ada_drhodt(
                 rho, tau, t, UI_input.k)
@@ -474,7 +486,9 @@ class ThrusterModel():
 
         # Main depressurization loop
         while m_curr > m_init*0.01 and t < decay_time:
+            time.sleep(0.25)
             t += time_step
+            i += 1
             dPdt = calc_dPdt(UI_input.P_0_init, tau, t)
             drhodt = calc_drhodt(UI_input.rho_0_init, tau, t)
             dTdt = calc_dTdt(UI_input.T_0_init, tau, t)
@@ -493,21 +507,19 @@ class ThrusterModel():
 
             UI_input.P_0 = P_curr
             UI_input, flow_result = self.calc_thermo(UI_input)
-            thr_depress_array.append(flow_result.thr)
-            QApplication.processEvents()
+            thr_curr = flow_result.thr
+            thr_depress_array.append(thr_curr)
+            if (i % 10 == 0):
+                yield UI_input, flow_result, t, P_curr, m_curr, thr_curr, T_curr
 
         P_depress_array = np.array(P_depress_array)
         m_depress_array = np.array(m_depress_array)
         thr_depress_array = np.array(thr_depress_array)
+        temp_depress_array = np.array(temp_depress_array)
         t_depress_array = np.linspace(time_step, t, len(P_depress_array))
 
-        canvas.axes_depress.plot(t_depress_array, P_depress_array, 'g-')
-        canvas.axes_mass.plot(t_depress_array, m_depress_array, 'r-')
-        canvas.axes_thrust.plot(t_depress_array, thr_depress_array, 'b-')   
-        canvas.axes_detemp.plot(t_depress_array, temp_depress_array, 'w-')
-
-        depress_button.setText("Calculation Complete")
-        QApplication.processEvents()
-        canvas.draw()
+        depress_result = (t_depress_array, P_depress_array, m_depress_array, 
+                          thr_depress_array, temp_depress_array)
+        return depress_result
 
     

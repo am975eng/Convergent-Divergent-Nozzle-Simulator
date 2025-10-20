@@ -8,7 +8,6 @@ class ThrusterController(QObject):
         self.model = model
         self.threadpool = QThreadPool()
 
-
         self.debounce = QTimer(singleShot=True, interval=400)
         self.debounce.timeout.connect(self.update_result)
 
@@ -27,7 +26,7 @@ class ThrusterController(QObject):
 
         self.view.optimize_button.clicked.connect(self.optimize_geom)
 
-        self.view.depress_button.clicked.connect(self.calc_depress)
+        self.view.depress_button.clicked.connect(self.depress)
 
         self.update_result()
 
@@ -44,31 +43,43 @@ class ThrusterController(QObject):
         worker.signals.finished.connect(self.on_finished)
         worker.signals.error.connect(self.on_error)
         self.threadpool.start(worker)
-        self.view.show_busy(True)
-
-    def on_finished(self):
-        print("Finished")
 
     def on_error(self, msg):
         self.view.show_error(msg)
-        self.view.show_busy(False)
     
     def on_results_ready(self, result):
-        print("Results ready")
-        UI_input = result[0]
-        flow_result = result[1]
+        UI_input, flow_result = result
         self.view.plot_data(UI_input, flow_result)
-        self.view.show_busy(False)
 
     def optimize_geom(self):
+        self.view.set_busy_state("optimize")
+        UI_input = self.view.extract_UI_data()
+        UI_input, flow_result = self.model.calc_thermo(UI_input)
+        opt_worker = Worker(self.model.calc_opt_geom, UI_input, flow_result,
+                            1000, 1E-3)
+        opt_worker.signals.progress.connect(self.on_results_ready)
+        opt_worker.signals.finished.connect(self.on_optimize_finished)
+        self.threadpool.start(opt_worker)
+    
+    def on_optimize_finished(self, opt_result):
+        UI_input, flow_result = opt_result
+        self.view.plot_data(UI_input, flow_result)
+        self.view.set_busy_state("finished")
+
+    def depress(self):
+        self.view.set_busy_state("depress")
         UI_input = self.view.extract_UI_data()
         result = self.model.calc_thermo(UI_input)
-        UI_input = result[0]
-        flow_result = result[1]
-        opt_worker = Worker(self.model.calc_opt_geom, UI_input, flow_result, 1000, 1E-3)
-        opt_worker.signals.progress.connect(self.on_results_ready)
-        opt_worker.signals.finished.connect(lambda: print("Optimization finished"))
-        self.threadpool.start(opt_worker)
+        UI_input, flow_result = result
+        depress_worker = Worker(self.model.calc_depress, UI_input, flow_result,
+                                0.00001)
+        depress_worker.signals.progress.connect(self.on_depress_progress)
+        depress_worker.signals.finished.connect(self.on_depress_finished)
+        self.threadpool.start(depress_worker)
 
-    def calc_depress(self):
-        pass
+    def on_depress_progress(self, depress_data_update):
+        self.view.plot_depress_update(depress_data_update)
+
+    def on_depress_finished(self, depress_result):
+        self.view.plot_depress(depress_result)
+        self.view.set_busy_state("finished")

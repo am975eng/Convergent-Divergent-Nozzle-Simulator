@@ -35,6 +35,7 @@ class UIInputs:
     M_exit_moc: float
     thr_design: float
     noz_type: str
+    depress_type: int
 
 class MainWindow(QMainWindow):
     """
@@ -62,14 +63,22 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Error loading styles: {e}")
 
-    def show_busy(self, state):
-        pass
-
     def init_UI(self):
         """Sets up UI by creating and positioning widgets."""
         
         # Set window properties
         self.setWindowTitle("CGT Designer")
+        self.resize(1500, 1000)
+        screen = self.screen() or QApplication.primaryScreen()   
+        screen_geometry = screen.availableGeometry()
+        
+        # Get window geometry
+        window_geometry = self.frameGeometry()
+        window_geometry.moveCenter(screen_geometry.center())
+
+        # Move the top-left point of the window to the adjusted position
+        self.move(window_geometry.topLeft())
+
         widget = QWidget()
 
         # Create widgets
@@ -274,11 +283,30 @@ class MainWindow(QMainWindow):
         thr_design = float(self.thrust_design_val.text())
 
         noz_type = self.noz_type_list.currentText()
+        depress_type = self.depress_type_list.currentText()
 
         return UIInputs(fluid, R_spec, k, T_0, P_0, rho_0, P_amb, T_star,
                         P_star, M_star, r_throat, r_inlet, r_outlet,
                         converg_angle, diverg_angle, len_inlet, M_exit_moc,
-                        thr_design, noz_type)
+                        thr_design, noz_type, depress_type)
+
+    def print_results(self, flow_result):
+
+        # Result Section
+        self.result_display_label.setText(flow_result.result_display)
+        self.P_e_sup_val.setText('{:.3g}'.format(flow_result.P_e_sup))
+        self.P_e_sub_val.setText('{:.3g}'.format(flow_result.P_e_sub))
+        self.P_e_shock_val.setText('{:.3g}'.format(flow_result.P_e_shock))
+        self.P_star_shock_val.setText(
+            '{:.3g}'.format(flow_result.P_star_shock))
+        self.m_dot_val.setText('{:.3g}'.format(flow_result.m_dot))
+        self.P_e_val.setText('{:.3g}'.format(flow_result.P_e))
+        self.m_prop_val.setText('{:.3g}'.format(flow_result.m_prop))
+        self.expansion_ratio_val.setText(
+            '{:.3g}'.format(flow_result.expansion_ratio))
+        self.ISP_val.setText('{:.3g}'.format(flow_result.ISP))
+        self.thrust_val.setText('{:.3g}'.format(flow_result.thr))
+
 
     def plot_data(self, UI_input, flow_result):
         def reflect_plot(axes):
@@ -315,8 +343,6 @@ class MainWindow(QMainWindow):
             span = np.max(y) - np.min(y)
             ax.set_xlim(np.min(x), np.max(x))
             ax.set_ylim(np.min(y) - 0.1*span, np.max(y)+0.15*span)
-
-        print("Plotting data...")
  
         for axes in [self.canvas.axes, self.canvas.axes_mass, 
             self.canvas.axes_press, self.canvas.axes_depress,
@@ -356,27 +382,53 @@ class MainWindow(QMainWindow):
         elif flow_result.x_over_shock[0] is not None:
             self.canvas.axes.plot(flow_result.x_over_shock,
                                   flow_result.y_over_shock, 'r-')
-            
+        
+        self.canvas.axes.relim()
+        self.canvas.axes.autoscale()
+
         reflect_plot(self.canvas.axes)
 
-        # Result Section
-        self.result_display_label.setText(flow_result.result_display)
-        self.P_e_sup_val.setText('{:.3g}'.format(flow_result.P_e_sup))
-        self.P_e_sub_val.setText('{:.3g}'.format(flow_result.P_e_sub))
-        self.P_e_shock_val.setText('{:.3g}'.format(flow_result.P_e_shock))
-        self.P_star_shock_val.setText(
-            '{:.3g}'.format(flow_result.P_star_shock))
-        self.m_dot_val.setText('{:.3g}'.format(flow_result.m_dot))
-        self.P_e_val.setText('{:.3g}'.format(flow_result.P_e))
-        self.m_prop_val.setText('{:.3g}'.format(flow_result.m_prop))
-        self.expansion_ratio_val.setText(
-            '{:.3g}'.format(flow_result.expansion_ratio))
-        self.ISP_val.setText('{:.3g}'.format(flow_result.ISP))
-        self.thrust_val.setText('{:.3g}'.format(flow_result.thr))
-
+        self.print_results(flow_result)
+        
         # Refresh canvas
         self.canvas.draw_idle()
 
+    def plot_depress_update(self, depress_data_update):
+        UI_input, flow_result, t, P_curr, m_curr, thr_curr, T_curr = depress_data_update
+        self.print_results(flow_result)
+
+        self.canvas.axes_depress.scatter(t, P_curr, color='g')
+        self.canvas.axes_mass.scatter(t, m_curr, color='r')
+        self.canvas.axes_thrust.scatter(t, thr_curr, color='b')   
+        self.canvas.axes_detemp.scatter(t, T_curr, color='w')
+
+        self.canvas.draw_idle()
+        
+    def plot_depress(self, depress_result):
+        t_depress_array, P_depress_array, m_depress_array, thr_depress_array, temp_depress_array = depress_result
+        self.canvas.axes_depress.plot(t_depress_array, P_depress_array, 'g-')
+        self.canvas.axes_mass.plot(t_depress_array, m_depress_array, 'r-')
+        self.canvas.axes_thrust.plot(t_depress_array, thr_depress_array, 'b-')   
+        self.canvas.axes_detemp.plot(t_depress_array, temp_depress_array, 'w-')
+
+        self.canvas.draw_idle()
+
+    def set_busy_state(self, type):
+        if type == "optimize":
+            self.optimize_button.setText("Optimizing...")
+            self.optimize_button.setEnabled(False)
+            self.depress_button.setEnabled(False)
+        elif type == "depress":
+            self.depress_button.setText("Depressing...")
+            self.optimize_button.setEnabled(False)
+            self.depress_button.setEnabled(False)
+        elif type == "finished":
+            self.optimize_button.setText("Optimize Geometry")
+            self.optimize_button.setEnabled(True)
+            self.depress_button.setText("Depressurize")
+            self.depress_button.setEnabled(True)
+        
+        
 
 class MplCanvas(FigureCanvas):
     """
