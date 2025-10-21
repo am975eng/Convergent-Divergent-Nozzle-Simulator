@@ -1,14 +1,17 @@
-from PyQt6.QtCore import QRunnable, QObject, pyqtSignal, QThread
+import inspect
+
+from PyQt6.QtCore import QRunnable, QObject, pyqtSignal
 
 
 class WorkerSignals(QObject):
     finished = pyqtSignal(object)
     error = pyqtSignal(str)
-    result = pyqtSignal(object)   # will emit UI_input and FlowResults
+    result = pyqtSignal(object)
     progress = pyqtSignal(object)
 
 
 class Worker(QRunnable):
+    """Task to be executed in a separate thread."""
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
         self.fn = fn
@@ -17,7 +20,8 @@ class Worker(QRunnable):
         self.signals = WorkerSignals()
 
     def run(self):
-        if 'progress_callback' in self.fn.__code__.co_varnames:
+        # If the function is a generator we need to emit progress signals
+        if inspect.isgeneratorfunction(self.fn):
             gen = self.fn(*self.args, **self.kwargs)
             while True:
                 try:

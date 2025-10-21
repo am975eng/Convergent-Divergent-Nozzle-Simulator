@@ -1,18 +1,29 @@
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import (QApplication, QComboBox, QGridLayout, QLabel,
-                             QLineEdit, QMainWindow, QSpacerItem, QWidget,
-                             QVBoxLayout, QHBoxLayout, QSizePolicy, 
-                             QPushButton)
+from pathlib import Path
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QGridLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QSpacerItem,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QSizePolicy,
+    QPushButton,
+    QProgressBar
+)
 from dataclasses import dataclass
-from matplotlib.backends.backend_qt5agg import (
-    FigureCanvasQTAgg as FigureCanvas)
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from matplotlib import colors as mpl_colors
 from matplotlib.collections import LineCollection
-
-from pathlib import Path
 import numpy as np
+
 
 @dataclass
 class UIInputs:
@@ -37,15 +48,16 @@ class UIInputs:
     noz_type: str
     depress_type: int
 
+
 class MainWindow(QMainWindow):
     """
     Main application window inherited from QMainWindow.
     """
+
     def __init__(self):
         super().__init__()
         self.load_styles()
         self.init_UI()
-
 
     def load_styles(self):
         """Load styles from QSS file"""
@@ -65,13 +77,13 @@ class MainWindow(QMainWindow):
 
     def init_UI(self):
         """Sets up UI by creating and positioning widgets."""
-        
+
         # Set window properties
         self.setWindowTitle("CGT Designer")
         self.resize(1500, 1000)
-        screen = self.screen() or QApplication.primaryScreen()   
+        screen = self.screen() or QApplication.primaryScreen()
         screen_geometry = screen.availableGeometry()
-        
+
         # Get window geometry
         window_geometry = self.frameGeometry()
         window_geometry.moveCenter(screen_geometry.center())
@@ -90,8 +102,9 @@ class MainWindow(QMainWindow):
         noz_label = QLabel("Nozzle Geometry Type")
         noz_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.noz_type_list = QComboBox()
-        self.noz_type_list.addItems(["MOC Full Length Nozzle",
-                                     "MOC Minimum Length Nozzle", "Conical"])
+        self.noz_type_list.addItems(
+            ["MOC Full Length Nozzle", "MOC Minimum Length Nozzle", "Conical"]
+        )
         P_chamber_label = QLabel("Chamber Pressure [Pa]")
         P_chamber_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.P_chamber_val = QLineEdit("5000")
@@ -108,6 +121,9 @@ class MainWindow(QMainWindow):
         thrust_design_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.thrust_design_val = QLineEdit("100")
         self.optimize_button = QPushButton("Optimize Geometry")
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
 
         length_inlet_label = QLabel("Inlet Length [m]")
         length_inlet_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -118,9 +134,9 @@ class MainWindow(QMainWindow):
         self.radius_throat_label = QLabel("Throat Radius [m]")
         self.radius_throat_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.radius_throat_val = QLineEdit("0.08")
-        self.radius_exit_label = QLabel("Exit Radius [m]")
-        self.radius_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.radius_exit_val = QLineEdit("0.1")
+        self.radius_outlet_label = QLabel("Exit Radius [m]")
+        self.radius_outlet_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.radius_outlet_val = QLineEdit("0.1")
         M_exit_label = QLabel("Exit Mach Number")
         M_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.M_exit_val = QLineEdit("2.0")
@@ -132,6 +148,7 @@ class MainWindow(QMainWindow):
         self.depress_type_list = QComboBox()
         self.depress_type_list.addItems(["Isothermal", "Adiabatic"])
         self.depress_button = QPushButton("Depressurize")
+        self.calc_button = QPushButton("Run")
 
         # Results Widgets
         results_label = QLabel("Result Summary")
@@ -181,42 +198,91 @@ class MainWindow(QMainWindow):
         # Create layout and add widgets
         option_layout = QGridLayout()
         add_to_layout = lambda col, start, *widgets: [
-            option_layout.addWidget(
-                widget, i+start, col) for i, widget in enumerate(widgets)]
-        add_to_layout(0, 0, DC_label, prop_label, self.prop_list, noz_label,
-                      self.noz_type_list, P_chamber_label, self.P_chamber_val,
-                      T_chamber_label, self.T_chamber_val, converg_label,
-                      self.converg_ang_val, diverg_label,
-                      self.diverg_angle_val, thrust_design_label,
-                      self.thrust_design_val, self.optimize_button)
-        add_to_layout(1, 1, length_inlet_label, self.length_inlet_val, 
-                      radius_inlet_label, self.radius_inlet_val, 
-                      self.radius_throat_label, self.radius_throat_val,
-                      self.radius_exit_label, self.radius_exit_val,
-                      M_exit_label, self.M_exit_val, P_amb_label,
-                      self.P_amb_val, depress_type, self.depress_type_list,
-                      self.depress_button)
+            option_layout.addWidget(widget, i + start, col)
+            for i, widget in enumerate(widgets)
+        ]
+        add_to_layout(
+            0,
+            0,
+            DC_label,
+            prop_label,
+            self.prop_list,
+            noz_label,
+            self.noz_type_list,
+            P_chamber_label,
+            self.P_chamber_val,
+            T_chamber_label,
+            self.T_chamber_val,
+            converg_label,
+            self.converg_ang_val,
+            diverg_label,
+            self.diverg_angle_val,
+            thrust_design_label,
+            self.thrust_design_val,
+            self.optimize_button,
+        )
+        add_to_layout(
+            1,
+            1,
+            length_inlet_label,
+            self.length_inlet_val,
+            radius_inlet_label,
+            self.radius_inlet_val,
+            self.radius_throat_label,
+            self.radius_throat_val,
+            self.radius_outlet_label,
+            self.radius_outlet_val,
+            M_exit_label,
+            self.M_exit_val,
+            P_amb_label,
+            self.P_amb_val,
+            depress_type,
+            self.depress_type_list,
+            self.depress_button,
+        )
         v_spacer = QSpacerItem(
-        20, 40,
-        QSizePolicy.Policy.Minimum,   # Doesn’t expand sideways
-        QSizePolicy.Policy.Expanding  # Absorbs all extra vertical space
+            20,
+            40,
+            QSizePolicy.Policy.Minimum,  # Doesn’t expand sideways
+            QSizePolicy.Policy.Expanding,  # Absorbs all extra vertical space
         )
         h_spacer = QSpacerItem(
-        40, 20,
-        QSizePolicy.Policy.Expanding,
-        QSizePolicy.Policy.Minimum
+            40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
         )
-        option_layout.addItem(v_spacer, 16, 0, 1, 2)
+        option_layout.addWidget(self.progress_bar,16,0, 1, 1)
+        option_layout.addWidget(self.calc_button, 16, 1, 1, 1)
+        option_layout.addItem(v_spacer, 17, 0, 1, 2)
 
-        option_layout.addWidget(results_label, 17, 0)
-        option_layout.addWidget(self.result_display_label, 18, 0, 1, 2)
-        add_to_layout(0,19, P_e_sup_label, self.P_e_sup_val, P_e_shock_label,
-                      self.P_e_shock_val, m_dot_label, self.m_dot_val, 
-                      m_prop_label, self.m_prop_val,ISP_label, self.ISP_val)
-        add_to_layout(1,19, P_e_sub_label, self.P_e_sub_val,
-                      P_star_shock_label, self.P_star_shock_val, P_exit_label,
-                      self.P_e_val, expansion_ratio_label,
-                      self.expansion_ratio_val, thrust_label, self.thrust_val)
+        option_layout.addWidget(results_label, 18, 0)
+        option_layout.addWidget(self.result_display_label, 19, 0, 1, 2)
+        add_to_layout(
+            0,
+            20,
+            P_e_sup_label,
+            self.P_e_sup_val,
+            P_e_shock_label,
+            self.P_e_shock_val,
+            m_dot_label,
+            self.m_dot_val,
+            m_prop_label,
+            self.m_prop_val,
+            ISP_label,
+            self.ISP_val,
+        )
+        add_to_layout(
+            1,
+            20,
+            P_e_sub_label,
+            self.P_e_sub_val,
+            P_star_shock_label,
+            self.P_star_shock_val,
+            P_exit_label,
+            self.P_e_val,
+            expansion_ratio_label,
+            self.expansion_ratio_val,
+            thrust_label,
+            self.thrust_val,
+        )
 
         graphic_layout = QVBoxLayout()
         self.canvas = MplCanvas(self)
@@ -230,52 +296,61 @@ class MainWindow(QMainWindow):
         widget.setLayout(outer_layout)
         self.setCentralWidget(widget)
 
-        self.canvas.axes.set_title('Centerline Values', color='white', 
-                                   fontsize=10)
-        self.canvas.axes.set_ylabel('Y Position [m]', color='white')
-        self.canvas.axes_mass.set_title('Depressurization Values',
-                                        color='white', fontsize=10)
-        self.canvas.axes_mass.set_ylabel('Mass [kg]', color='white')
-        self.canvas.axes_press.set_ylabel('Pressure [Pa]', color='white')
-        self.canvas.axes_depress.set_ylabel('Pressure [Pa]', color='white')
-        self.canvas.axes_mach.set_ylabel('Mach Number', color='white')
-        self.canvas.axes_thrust.set_ylabel('Thrust [N]', color='white')
-        self.canvas.axes_temp.set_ylabel('Temperature [K]', color='white')
-        self.canvas.axes_temp.set_xlabel('X Position [m]', color='white')
-        self.canvas.axes_detemp.set_ylabel('Temperature [K]', color='white')
-        self.canvas.axes_detemp.set_xlabel('Time [s]', color='white')
+        self.canvas.axes.set_title(
+            "Centerline Values", color="white", fontsize=10
+        )
+        self.canvas.axes.set_ylabel("Y Position [m]", color="white")
+        self.canvas.axes_mass.set_title(
+            "Depressurization Values", color="white", fontsize=10
+        )
+        self.canvas.axes_mass.set_ylabel("Mass [kg]", color="white")
+        self.canvas.axes_press.set_ylabel("Pressure [Pa]", color="white")
+        self.canvas.axes_depress.set_ylabel("Pressure [Pa]", color="white")
+        self.canvas.axes_mach.set_ylabel("Mach Number", color="white")
+        self.canvas.axes_thrust.set_ylabel("Thrust [N]", color="white")
+        self.canvas.axes_temp.set_ylabel("Temperature [K]", color="white")
+        self.canvas.axes_temp.set_xlabel("X Position [m]", color="white")
+        self.canvas.axes_detemp.set_ylabel("Temperature [K]", color="white")
+        self.canvas.axes_detemp.set_xlabel("Time [s]", color="white")
 
     def extract_UI_data(self):
+        """
+        Extracts UI data from input widgets.
+
+        Returns:
+            UIInputs (dataclass) - Contains any data input by user.
+        """
+
         fluid = self.prop_list.currentText()
         if fluid == "Air":
             R_spec = 287
-            k=1.4
+            k = 1.4
         elif fluid == "CO2":
             R_spec = 188.9
-            k=1.289
+            k = 1.289
         elif fluid == "N2":
             R_spec = 296.8
-            k=1.4
+            k = 1.4
         elif fluid == "Xe":
             R_spec = 63.33
-            k=1.667
+            k = 1.667
 
         # Extract thermo. properties
         T_0 = float(self.T_chamber_val.text())
         P_0 = float(self.P_chamber_val.text())
-        rho_0 = P_0/(R_spec*T_0)
+        rho_0 = P_0 / (R_spec * T_0)
         P_amb = float(self.P_amb_val.text())
 
         # Throat Conditions
-        T_star = T_0 * (2/(k+1))
-        P_star = P_0 * ((2/(k+1))**(k/(k-1)))
+        T_star = T_0 * (2 / (k + 1))
+        P_star = P_0 * ((2 / (k + 1)) ** (k / (k - 1)))
         M_star = 1
 
         # Geometry
         r_throat = float(self.radius_throat_val.text())
         r_inlet = float(self.radius_inlet_val.text())
-        r_outlet = float(self.radius_exit_val.text())
-        converg_angle= np.deg2rad(float(self.converg_ang_val.text()))
+        r_outlet = float(self.radius_outlet_val.text())
+        converg_angle = np.deg2rad(float(self.converg_ang_val.text()))
         diverg_angle = np.deg2rad(float(self.diverg_angle_val.text()))
         len_inlet = float(self.length_inlet_val.text())
 
@@ -285,45 +360,76 @@ class MainWindow(QMainWindow):
         noz_type = self.noz_type_list.currentText()
         depress_type = self.depress_type_list.currentText()
 
-        return UIInputs(fluid, R_spec, k, T_0, P_0, rho_0, P_amb, T_star,
-                        P_star, M_star, r_throat, r_inlet, r_outlet,
-                        converg_angle, diverg_angle, len_inlet, M_exit_moc,
-                        thr_design, noz_type, depress_type)
+        return UIInputs(
+            fluid,
+            R_spec,
+            k,
+            T_0,
+            P_0,
+            rho_0,
+            P_amb,
+            T_star,
+            P_star,
+            M_star,
+            r_throat,
+            r_inlet,
+            r_outlet,
+            converg_angle,
+            diverg_angle,
+            len_inlet,
+            M_exit_moc,
+            thr_design,
+            noz_type,
+            depress_type,
+        )
 
     def print_results(self, flow_result):
+        """Update UI display table with results."""
 
         # Result Section
         self.result_display_label.setText(flow_result.result_display)
-        self.P_e_sup_val.setText('{:.3g}'.format(flow_result.P_e_sup))
-        self.P_e_sub_val.setText('{:.3g}'.format(flow_result.P_e_sub))
-        self.P_e_shock_val.setText('{:.3g}'.format(flow_result.P_e_shock))
-        self.P_star_shock_val.setText(
-            '{:.3g}'.format(flow_result.P_star_shock))
-        self.m_dot_val.setText('{:.3g}'.format(flow_result.m_dot))
-        self.P_e_val.setText('{:.3g}'.format(flow_result.P_e))
-        self.m_prop_val.setText('{:.3g}'.format(flow_result.m_prop))
+        self.P_e_sup_val.setText("{:.3g}".format(flow_result.P_e_sup))
+        self.P_e_sub_val.setText("{:.3g}".format(flow_result.P_e_sub))
+        self.P_e_shock_val.setText("{:.3g}".format(flow_result.P_e_shock))
+        self.P_star_shock_val.setText("{:.3g}".format(flow_result.P_star_shock))
+        self.m_dot_val.setText("{:.3g}".format(flow_result.m_dot))
+        self.P_e_val.setText("{:.3g}".format(flow_result.P_e))
+        self.m_prop_val.setText("{:.3g}".format(flow_result.m_prop))
         self.expansion_ratio_val.setText(
-            '{:.3g}'.format(flow_result.expansion_ratio))
-        self.ISP_val.setText('{:.3g}'.format(flow_result.ISP))
-        self.thrust_val.setText('{:.3g}'.format(flow_result.thr))
+            "{:.3g}".format(flow_result.expansion_ratio)
+        )
+        self.ISP_val.setText("{:.3g}".format(flow_result.ISP))
+        self.thrust_val.setText("{:.4g}".format(flow_result.thr))
 
+    def plot_data(self, UI_input, flow_result, bar_value=None):
+        """Updates flow plots with new data.
 
-    def plot_data(self, UI_input, flow_result):
+        Inputs:
+            UI_input (dataclass) - User inputs
+            flow_result (dataclass) - Flow results
+        """
+
         def reflect_plot(axes):
             """
             Reflects the plot on the opposite side of the x-axis
+
+            Inputs:
+                axes (matplotlib axis) - Axis to plot on
             """
             lines = axes.get_lines()
             for line in lines:
                 x_data = line.get_xdata()
                 y_data = line.get_ydata()
 
-                axes.plot(x_data, -y_data,
+                axes.plot(
+                    x_data,
+                    -y_data,
                     color=line.get_color(),
                     linestyle=line.get_linestyle(),
-                    linewidth=line.get_linewidth())
-                
-        def gen_cmap_plot(x,y,ax):
+                    linewidth=line.get_linewidth(),
+                )
+
+        def gen_cmap_plot(x, y, ax):
             """
             Generates a colormap plot of the given data.
 
@@ -334,20 +440,27 @@ class MainWindow(QMainWindow):
             """
             points = np.array([x, y]).T.reshape(-1, 1, 2)
             segments = np.concatenate([points[:-1], points[1:]], axis=1)
-            cmap = plt.cm.RdYlBu 
+            cmap = plt.cm.RdYlBu
             norm = mpl_colors.Normalize(vmin=np.min(-y), vmax=np.max(-y))
             lc = LineCollection(segments, cmap=cmap, norm=norm, linewidth=1)
-            lc.set_array(-y) 
+            lc.set_array(-y)
 
             ax.add_collection(lc)
             span = np.max(y) - np.min(y)
             ax.set_xlim(np.min(x), np.max(x))
-            ax.set_ylim(np.min(y) - 0.1*span, np.max(y)+0.15*span)
- 
-        for axes in [self.canvas.axes, self.canvas.axes_mass, 
-            self.canvas.axes_press, self.canvas.axes_depress,
-            self.canvas.axes_mach, self.canvas.axes_thrust,
-            self.canvas.axes_temp, self.canvas.axes_detemp]:
+            ax.set_ylim(np.min(y) - 0.1 * span, np.max(y) + 0.15 * span)
+
+        # Clear plots
+        for axes in [
+            self.canvas.axes,
+            self.canvas.axes_mass,
+            self.canvas.axes_press,
+            self.canvas.axes_depress,
+            self.canvas.axes_mach,
+            self.canvas.axes_thrust,
+            self.canvas.axes_temp,
+            self.canvas.axes_detemp,
+        ]:
             for line in axes.lines:
                 line.remove()
             for collection in axes.collections:
@@ -355,92 +468,176 @@ class MainWindow(QMainWindow):
 
         self.canvas.axes.plot(
             [flow_result.x_conv[0], flow_result.x_conv[0] - UI_input.len_inlet],
-            [flow_result.y_conv[0], flow_result.y_conv[0]], 'b-', linewidth=2)
+            [flow_result.y_conv[0], flow_result.y_conv[0]],
+            "b-",
+            linewidth=2,
+        )
         self.canvas.axes.plot(
-            [flow_result.x_conv[0] - UI_input.len_inlet,
-             flow_result.x_conv[0] - UI_input.len_inlet],
-            [flow_result.y_conv[0], 0], 'b-', linewidth=2)
-        self.canvas.axes.plot(flow_result.x_conv, flow_result.y_conv, 'b-',
-                              linewidth=2)
-        self.canvas.axes.plot(flow_result.x_div, flow_result.y_div, 'b-',
-                              linewidth=2)
+            [
+                flow_result.x_conv[0] - UI_input.len_inlet,
+                flow_result.x_conv[0] - UI_input.len_inlet,
+            ],
+            [flow_result.y_conv[0], 0],
+            "b-",
+            linewidth=2,
+        )
+        self.canvas.axes.plot(
+            flow_result.x_conv, flow_result.y_conv, "b-", linewidth=2
+        )
+        self.canvas.axes.plot(
+            flow_result.x_div, flow_result.y_div, "b-", linewidth=2
+        )
 
-        gen_cmap_plot(np.concatenate([flow_result.x_conv, flow_result.x_div]),
-                      flow_result.P_array, self.canvas.axes_press)
-        gen_cmap_plot(np.concatenate([flow_result.x_conv, flow_result.x_div]),
-                      flow_result.M_array, self.canvas.axes_mach)
-        gen_cmap_plot(np.concatenate([flow_result.x_conv, flow_result.x_div]),
-                      flow_result.T_array, self.canvas.axes_temp)
-        
-        # Shock effect
+        gen_cmap_plot(
+            np.concatenate([flow_result.x_conv, flow_result.x_div]),
+            flow_result.P_array,
+            self.canvas.axes_press,
+        )
+        gen_cmap_plot(
+            np.concatenate([flow_result.x_conv, flow_result.x_div]),
+            flow_result.M_array,
+            self.canvas.axes_mach,
+        )
+        gen_cmap_plot(
+            np.concatenate([flow_result.x_conv, flow_result.x_div]),
+            flow_result.T_array,
+            self.canvas.axes_temp,
+        )
+
+        # Plot shockwaves
         if flow_result.x_under_shock[0] is not None:
             for i in range(len(flow_result.x_under_shock[1])):
-                self.canvas.axes.plot([flow_result.x_under_shock[0],
-                                       flow_result.x_under_shock[1][i]],
-                                      [flow_result.y_under_shock[0],
-                                       flow_result.y_under_shock[1][i]], 'g-')
+                self.canvas.axes.plot(
+                    [
+                        flow_result.x_under_shock[0],
+                        flow_result.x_under_shock[1][i],
+                    ],
+                    [
+                        flow_result.y_under_shock[0],
+                        flow_result.y_under_shock[1][i],
+                    ],
+                    "g-",
+                )
         elif flow_result.x_over_shock[0] is not None:
-            self.canvas.axes.plot(flow_result.x_over_shock,
-                                  flow_result.y_over_shock, 'r-')
-        
+            self.canvas.axes.plot(
+                flow_result.x_over_shock, flow_result.y_over_shock, "r-"
+            )
+
         self.canvas.axes.relim()
         self.canvas.axes.autoscale()
 
         reflect_plot(self.canvas.axes)
 
         self.print_results(flow_result)
-        
+        if bar_value is not None:
+            self.progress_bar.setValue(bar_value)
+            self.radius_throat_val.setText("{:.3g}".format(UI_input.r_throat))
+            self.radius_outlet_val.setText("{:.3g}".format(UI_input.r_outlet))
+            self.radius_inlet_val.setText("{:.3g}".format(UI_input.r_inlet))
+
         # Refresh canvas
         self.canvas.draw_idle()
 
     def plot_depress_update(self, depress_data_update):
-        UI_input, flow_result, t, P_curr, m_curr, thr_curr, T_curr = depress_data_update
+        """
+        Plots the current state of depressurization.
+
+        Inputs:
+            depress_data_update (tuple) - Tuple containing the following:
+                UI_input (dataclass) - User inputs
+                flow_result (dataclass) - Flow results
+                t (float) - Current time
+                P_curr (float) - Current pressure
+                m_curr (float) - Current mass
+                thr_curr (float) - Current thrust
+                T_curr (float) - Current temperature
+                i (float) - Current iteration num/max_iterations
+        """
+        UI_input, flow_result, t, P_curr, m_curr, thr_curr, T_curr, i = (
+            depress_data_update
+        )
         self.print_results(flow_result)
 
-        self.canvas.axes_depress.scatter(t, P_curr, color='g')
-        self.canvas.axes_mass.scatter(t, m_curr, color='r')
-        self.canvas.axes_thrust.scatter(t, thr_curr, color='b')   
-        self.canvas.axes_detemp.scatter(t, T_curr, color='w')
+        self.progress_bar.setValue(int(i*100))
+
+        self.canvas.axes_depress.scatter(t, P_curr, color="g")
+        self.canvas.axes_mass.scatter(t, m_curr, color="r")
+        self.canvas.axes_thrust.scatter(t, thr_curr, color="b")
+        self.canvas.axes_detemp.scatter(t, T_curr, color="w")
 
         self.canvas.draw_idle()
-        
-    def plot_depress(self, depress_result):
-        t_depress_array, P_depress_array, m_depress_array, thr_depress_array, temp_depress_array = depress_result
-        self.canvas.axes_depress.plot(t_depress_array, P_depress_array, 'g-')
-        self.canvas.axes_mass.plot(t_depress_array, m_depress_array, 'r-')
-        self.canvas.axes_thrust.plot(t_depress_array, thr_depress_array, 'b-')   
-        self.canvas.axes_detemp.plot(t_depress_array, temp_depress_array, 'w-')
+
+    def plot_depress_final(self, depress_result):
+        """Plots the complete depressurization curve and updates flow
+        centerline plots.
+
+        Inputs:
+            depress_result (tuple) - Tuple containing the following:
+                UI_input (dataclass) - User inputs
+                flow_result (dataclass) - Flow results
+                t_depress_array (list) - Time array
+                P_depress_array (list) - Pressure array
+                m_depress_array (list) - Mass array
+                thr_depress_array (list) - Thrust array
+                temp_depress_array (list) - Temperature array
+        """
+        (
+            UI_input,
+            flow_result,
+            t_depress_array,
+            P_depress_array,
+            m_depress_array,
+            thr_depress_array,
+            temp_depress_array,
+        ) = depress_result
+
+        self.plot_data(UI_input, flow_result)
+
+        self.canvas.axes_depress.plot(t_depress_array, P_depress_array, "g-")
+        self.canvas.axes_mass.plot(t_depress_array, m_depress_array, "r-")
+        self.canvas.axes_thrust.plot(t_depress_array, thr_depress_array, "b-")
+        self.canvas.axes_detemp.plot(t_depress_array, temp_depress_array, "w-")
 
         self.canvas.draw_idle()
 
     def set_busy_state(self, type):
+        """Sets the busy state of the UI to prevent user interaction."""
         if type == "optimize":
+            self.calc_button.setStyleSheet("background-color: blue;")
             self.optimize_button.setText("Optimizing...")
             self.optimize_button.setEnabled(False)
             self.depress_button.setEnabled(False)
+            self.calc_button.setEnabled(False)
+            self.progress_bar.setValue(0)
         elif type == "depress":
             self.depress_button.setText("Depressing...")
             self.optimize_button.setEnabled(False)
             self.depress_button.setEnabled(False)
+            self.calc_button.setEnabled(False)
+            self.progress_bar.setValue(0)
         elif type == "finished":
             self.optimize_button.setText("Optimize Geometry")
             self.optimize_button.setEnabled(True)
             self.depress_button.setText("Depressurize")
             self.depress_button.setEnabled(True)
-        
-        
+            self.progress_bar.setValue(100)
+            self.calc_button.setEnabled(True)
+            self.calc_button.setStyleSheet("background-color: green;")
+
+
 
 class MplCanvas(FigureCanvas):
     """
     Matplotlib canvas generated using Agg engine that can function as a
     QWidget.
     """
+
     def __init__(self, parent=None):
         """
-        Initializes the instance with a figure and subplot axes and sets 
+        Initializes the instance with a figure and subplot axes and sets
         style properties.
         """
-        self.fig = Figure(figsize=(9, 9),constrained_layout=True)
+        self.fig = Figure(figsize=(9, 9), constrained_layout=True)
         self.fig.patch.set_alpha(0)
         self.axes = self.fig.add_subplot(421)
         self.axes_mass = self.fig.add_subplot(422)
@@ -452,18 +649,25 @@ class MplCanvas(FigureCanvas):
         self.axes_detemp = self.fig.add_subplot(428)
 
         self.axes.grid(True)
-        self.axes.title.set_color('white')
+        self.axes.title.set_color("white")
 
-        all_axes = [self.axes, self.axes_mass, self.axes_press, 
-                    self.axes_depress, self.axes_mach, self.axes_thrust, 
-                    self.axes_temp, self.axes_detemp]
+        all_axes = [
+            self.axes,
+            self.axes_mass,
+            self.axes_press,
+            self.axes_depress,
+            self.axes_mach,
+            self.axes_thrust,
+            self.axes_temp,
+            self.axes_detemp,
+        ]
         for ax in all_axes:
-            ax.set_facecolor('none')
-            ax.spines['top'].set_color('white')
-            ax.spines['bottom'].set_color('white')
-            ax.spines['left'].set_color('white')
-            ax.spines['right'].set_color('white')
-            ax.tick_params(colors='white')
+            ax.set_facecolor("none")
+            ax.spines["top"].set_color("white")
+            ax.spines["bottom"].set_color("white")
+            ax.spines["left"].set_color("white")
+            ax.spines["right"].set_color("white")
+            ax.tick_params(colors="white")
 
         super().__init__(self.fig)
         self.setParent(parent)
