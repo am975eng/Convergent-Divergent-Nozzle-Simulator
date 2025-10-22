@@ -31,7 +31,7 @@ class ThrusterController(QObject):
         self.view.radius_inlet_val.textChanged.connect(self.schedule_update)
         self.view.radius_throat_val.textChanged.connect(self.schedule_update)
         self.view.radius_outlet_val.textChanged.connect(self.schedule_update)
-        self.view.M_exit_val.textChanged.connect(self.schedule_update)
+        self.view.M_exit_moc_val.textChanged.connect(self.schedule_update)
         self.view.P_amb_val.textChanged.connect(self.schedule_update)
 
         self.view.optimize_button.clicked.connect(self.optimize_geom)
@@ -40,6 +40,8 @@ class ThrusterController(QObject):
 
         self.view.calc_button.clicked.connect(self.update_result)
 
+        self.view.update_UI_nozzle()
+
         self.update_result()
 
     def schedule_update(self):
@@ -47,6 +49,7 @@ class ThrusterController(QObject):
         self.debounce.start()
 
     def set_calc_needed(self):
+        self.view.update_UI_nozzle()
         self.view.calc_button.setStyleSheet("background-color: red;")
 
     def update_result(self):
@@ -62,7 +65,7 @@ class ThrusterController(QObject):
 
     def on_results_ready(self, result):
         UI_input, flow_result = result
-        self.view.plot_data(UI_input, flow_result)
+        self.view.plot_flow_data(UI_input, flow_result)
         self.view.calc_button.setStyleSheet("background-color: green;")
 
     def optimize_geom(self):
@@ -77,11 +80,11 @@ class ThrusterController(QObject):
 
     def on_optimize_progress(self, opt_data_update):
         UI_input, flow_result, bar_value = opt_data_update
-        self.view.plot_data(UI_input, flow_result, bar_value)
+        self.view.plot_flow_data(UI_input, flow_result, bar_value)
 
     def on_optimize_finished(self, opt_result):
         UI_input, flow_result = opt_result
-        self.view.plot_data(UI_input, flow_result)
+        self.view.plot_flow_data(UI_input, flow_result)
         self.view.set_busy_state("finished")
 
     def depress(self):

@@ -137,9 +137,9 @@ class MainWindow(QMainWindow):
         self.radius_outlet_label = QLabel("Exit Radius [m]")
         self.radius_outlet_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.radius_outlet_val = QLineEdit("0.1")
-        M_exit_label = QLabel("Exit Mach Number")
-        M_exit_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.M_exit_val = QLineEdit("2.0")
+        M_exit_moc_label = QLabel("Exit Mach Number")
+        M_exit_moc_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.M_exit_moc_val = QLineEdit("2.0")
         P_amb_label = QLabel("Ambient Pressure [Pa]")
         P_amb_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.P_amb_val = QLineEdit("0")
@@ -232,8 +232,8 @@ class MainWindow(QMainWindow):
             self.radius_throat_val,
             self.radius_outlet_label,
             self.radius_outlet_val,
-            M_exit_label,
-            self.M_exit_val,
+            M_exit_moc_label,
+            self.M_exit_moc_val,
             P_amb_label,
             self.P_amb_val,
             depress_type,
@@ -296,9 +296,13 @@ class MainWindow(QMainWindow):
         widget.setLayout(outer_layout)
         self.setCentralWidget(widget)
 
+        self.grey_out_style = """QLineEdit[enabled="false"]
+            {Background-color: #a3a3a3; color: white;}
+            QLineEdit[enabled="true"]
+            {Background-color: white; color: black;}"""
+
         self.canvas.axes.set_title(
-            "Centerline Values", color="white", fontsize=10
-        )
+            "Centerline Values", color="white", fontsize=10)
         self.canvas.axes.set_ylabel("Y Position [m]", color="white")
         self.canvas.axes_mass.set_title(
             "Depressurization Values", color="white", fontsize=10
@@ -354,7 +358,7 @@ class MainWindow(QMainWindow):
         diverg_angle = np.deg2rad(float(self.diverg_angle_val.text()))
         len_inlet = float(self.length_inlet_val.text())
 
-        M_exit_moc = float(self.M_exit_val.text())
+        M_exit_moc = float(self.M_exit_moc_val.text())
         thr_design = float(self.thrust_design_val.text())
 
         noz_type = self.noz_type_list.currentText()
@@ -383,6 +387,27 @@ class MainWindow(QMainWindow):
             depress_type,
         )
 
+    def update_UI_nozzle(self):
+        if self.noz_type_list.currentText() == "MOC Full Length Nozzle" or self.noz_type_list.currentText() == "MOC Minimum Length Nozzle":
+            self.converg_ang_val.setEnabled(False)
+            self.converg_ang_val.setStyleSheet(self.grey_out_style)
+            self.diverg_angle_val.setEnabled(False)
+            self.diverg_angle_val.setStyleSheet(self.grey_out_style)
+            self.radius_outlet_val.setEnabled(False)
+            self.radius_outlet_val.setStyleSheet(self.grey_out_style)
+            self.M_exit_moc_val.setEnabled(True)
+            self.M_exit_moc_val.setStyleSheet(self.grey_out_style)
+        elif self.noz_type_list.currentText() == "Conical":
+            self.converg_ang_val.setEnabled(True)
+            self.converg_ang_val.setStyleSheet(self.grey_out_style)
+            self.diverg_angle_val.setEnabled(True)
+            self.diverg_angle_val.setStyleSheet(self.grey_out_style)
+            self.radius_outlet_val.setEnabled(True)
+            self.radius_outlet_val.setStyleSheet(self.grey_out_style)
+            self.M_exit_moc_val.setEnabled(False)
+            self.M_exit_moc_val.setStyleSheet(self.grey_out_style)
+
+
     def print_results(self, flow_result):
         """Update UI display table with results."""
 
@@ -401,7 +426,7 @@ class MainWindow(QMainWindow):
         self.ISP_val.setText("{:.3g}".format(flow_result.ISP))
         self.thrust_val.setText("{:.4g}".format(flow_result.thr))
 
-    def plot_data(self, UI_input, flow_result, bar_value=None):
+    def plot_flow_data(self, UI_input, flow_result, bar_value=None):
         """Updates flow plots with new data.
 
         Inputs:
@@ -591,7 +616,7 @@ class MainWindow(QMainWindow):
             temp_depress_array,
         ) = depress_result
 
-        self.plot_data(UI_input, flow_result)
+        self.plot_flow_data(UI_input, flow_result)
 
         self.canvas.axes_depress.plot(t_depress_array, P_depress_array, "g-")
         self.canvas.axes_mass.plot(t_depress_array, m_depress_array, "r-")
