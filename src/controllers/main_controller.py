@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QTimer, QThreadPool, QObject
 
-from workers import Worker
+from controllers.workers import Worker
 
 
 class ThrusterController(QObject):

@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from dataclasses import dataclass
-from models.thruster import ThrusterModel
+from ..src.models.thruster import ThrusterModel
 
 
 @dataclass
@@ -80,22 +80,39 @@ class TestCDNozzle(unittest.TestCase):
         )
 
     def test_model_thermo_vacuum(self):
+        # Vacuum back pressure test
         self.UI_input.P_amb = 0
         self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
 
-        self.assertAlmostEqual(flow_result.P_e_sup, self.UI_input.P_0 * 0.0765, delta = self.UI_input.P_0 * 0.0765 / 100)
-        self.assertAlmostEqual(flow_result.P_e_sub, self.UI_input.P_0 * 0.95, delta = self.UI_input.P_0 * 0.95 / 100)
-        
+        # Check if exit pressure match external isentropic calculator
+        self.assertAlmostEqual(
+            flow_result.P_e_sup,
+            self.UI_input.P_0 * 0.0765,
+            delta=self.UI_input.P_0 * 0.0765 / 100,
+        )
+        self.assertAlmostEqual(
+            flow_result.P_e_sub,
+            self.UI_input.P_0 * 0.95,
+            delta=self.UI_input.P_0 * 0.95 / 100,
+        )
+
         self.assertGreater(flow_result.P_e, self.UI_input.P_amb)
+        # A shock at throat should yield higher pressure than exit shock
         self.assertGreater(flow_result.P_star_shock, flow_result.P_e_shock)
-    
+
     def test_model_thermo_shock(self):
         # Check if normal shock can be handled
         self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
-        self.UI_input.P_amb = (flow_result.P_star_shock + flow_result.P_e_shock)/2
+        self.UI_input.P_amb = (
+            flow_result.P_star_shock + flow_result.P_e_shock
+        ) / 2
         self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
-        
-        self.assertAlmostEqual(flow_result.P_e, self.UI_input.P_amb, delta = flow_result.P_e/20)
+
+        # Check if exit pressure is close to ambient pressure
+        self.assertAlmostEqual(
+            flow_result.P_e, self.UI_input.P_amb, delta=flow_result.P_e / 100
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

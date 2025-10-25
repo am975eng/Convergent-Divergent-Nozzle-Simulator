@@ -32,7 +32,7 @@ from sklearn.metrics import r2_score
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
-import Aero_Thermo as AT
+import thermodynamics.aero_thermo as AT
 
 
 def high_poly_law(x, a, b, c, d, e):

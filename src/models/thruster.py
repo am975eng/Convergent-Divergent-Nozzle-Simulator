@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from scipy.optimize import fsolve, root_scalar
 from CoolProp.CoolProp import PropsSI, AbstractState
 
-import Aero_Thermo as AT
-import Method_Of_Char as MOC
-from Optimizer import ADAM_Optimizer
+from thermodynamics import aero_thermo as AT
+from thermodynamics import method_of_char as MOC
+from optimizers.optimizers import ADAM_Optimizer
+from logger import setup_logger
 
 
 @dataclass
@@ -36,6 +37,7 @@ class FlowResults:
     x_over_shock: list
     y_over_shock: list
 
+logger = setup_logger(__name__)
 
 class ThrusterModel:
     """
@@ -52,6 +54,7 @@ class ThrusterModel:
         Outputs:
             flow_result (dataclass) - Flow results
         """
+        logger.info("Calculating flow properties...")
         A_star = math.pi * (UI_input.r_throat**2)
         A_inlet = math.pi * (UI_input.r_inlet**2)
         A_outlet = math.pi * (UI_input.r_outlet**2)
@@ -92,10 +95,7 @@ class ThrusterModel:
                 args=(UI_input.M_star, A_outlet, A_star, UI_input.k),
             ).root
         except ValueError as e:
-            print(
-                "Unable to solve for Mach numbers."
-                + "Expand solver bracket to ensure solution exists."
-            )
+            logger.error("Failed to calculate Mach numbers at exit, expand root_scalar solution bracket to solve.")
 
         # Preallocation
         P_array = np.zeros(len(x_conv) + len(x_div))
@@ -175,12 +175,14 @@ class ThrusterModel:
         ).root
         P_star_shock = AT.calc_isen_press(M_y_e, UI_input.P_0_y, UI_input.k)
 
+        logger.info("Comparing back and exit pressure...")
         if abs(UI_input.P_amb - P_e_sup) / P_e_sup < 0.1 or (
             UI_input.P_amb < 50 and P_e_sup < 100
         ):
             # Check if Back pressure and supersonic exit pressure are close
             # enough for perfect expansion
             result_display = "Perfectly expanded supersonic exhaust!"
+            logger.info(result_display)
             for index in range(len(x_div)):
                 A_x = math.pi * (y_div[index] ** 2)
                 shift = index + len(x_conv)
@@ -199,9 +201,11 @@ class ThrusterModel:
             result_display = (
                 "Back pressure high enough to generate reversed flow"
             )
+            logger.error(result_display)
         elif UI_input.P_amb >= P_e_sub:
             # Back pressure is too high for choked subsonic flow
             result_display = "Back pressure too high for choked subsonic flow"
+            logger.info(result_display)
             M_e_sub = root_scalar(
                 AT.RS_Mach_Press_Isen,
                 bracket=[0.0001, 1],
@@ -230,8 +234,7 @@ class ThrusterModel:
                 T_array[shift] = T_x
 
         elif UI_input.P_amb > P_e_shock:
-            """Back pressure is low enough for choked supersonic flow with
-            possible normal shock"""
+            logger.info("Back pressure is low enough for choked supersonic flow with possible normal shock")
             for index in range(len(x_div)):
                 A_x = math.pi * (y_div[index] ** 2)
                 shift = index + len(x_conv)
@@ -284,12 +287,12 @@ class ThrusterModel:
                     )
 
                     if abs((P_y_e - UI_input.P_amb) / P_y_e) < 0.01:
-                        print("Shock location calculated")
                         x_shock = x_div[index]
                         result_display = (
                             f"Normal shock generated in divergent section"
                             f"at {x_shock:.3f} m"
                         )
+                        logger.info(result_display)
                 else:
                     M_y_curr = root_scalar(
                         AT.RS_Area_Mach_X_Y,
@@ -309,6 +312,7 @@ class ThrusterModel:
         elif UI_input.P_amb > P_e_sup:
             # Overexpanded nozzle with shockwaves in exhaust
             result_display = "Overexpanded exhaust with shockwaves in exhaust"
+            logger.info(result_display)
             for index in range(len(x_div)):
                 A_x = math.pi * (y_div[index] ** 2)
                 shift = index + len(x_conv)
@@ -339,7 +343,7 @@ class ThrusterModel:
         else:
             # Underexpanded nozzle
             result_display = "Underexpanded supersonic exhaust"
-
+            logger.info(result_display)
             # Divergent section - Supersonic flow
             for index in range(len(x_div)):
                 A_x = math.pi * (y_div[index] * y_div[index])
@@ -411,6 +415,7 @@ class ThrusterModel:
         m_prop = UI_input.rho_0 * V_0
 
         # Convergent section
+        logger.info("Calculating convergent section...")
         for index in range(len(x_conv)):
             A_x = math.pi * (y_conv[index] ** 2)
             M_x_sub = root_scalar(
@@ -466,7 +471,7 @@ class ThrusterModel:
             learning_rate (float) - Learning rate for optimizer
             progress_callback (None) - Marker
         """
-
+        logger.info("Calculating optimal nozzle geometry...")
         A_star = math.pi * (UI_input.r_throat**2)
         A_inlet = math.pi * (UI_input.r_inlet**2)
         A_outlet = math.pi * (UI_input.r_outlet**2)
@@ -537,18 +542,18 @@ class ThrusterModel:
             cost_curr, flow_result = calc_cost(UI_input)
 
             if abs(cost_curr) < tol:
-                print(f"Convergence achieved after {iteration:.0f} iterations")
+                logger.info(f"Convergence achieved after {iteration:.0f} iterations")
                 return UI_input, flow_result
 
             gradient = calc_gradient(UI_input)
             update = optimizer.update(gradient)
 
             if iteration % 4 == 0:
+                logger.info(f"Iteration {iteration:.0f} of {max_iterations:.0f} complete")
                 yield UI_input, flow_result, int(
                     100 * iteration / max_iterations
                 )
 
-            print(f"update{update:.3g}")
             UI_input.r_throat -= update
             UI_input.r_outlet = (
                 (UI_input.r_throat**2) * area_ratio_outlet
@@ -558,7 +563,7 @@ class ThrusterModel:
             ) ** 0.5
 
         else:
-            print(f"Convergence failed after {max_iterations:.0f} iterations")
+            logger.error(f"Convergence failed after {max_iterations:.0f} iterations")
 
     def calc_depress(self, UI_input, flow_result, max_iterations=100):
         """
@@ -566,7 +571,7 @@ class ThrusterModel:
         depressurization. Assumes choked flow and uses derivative eqns. with
         Euler's method.
         """
-
+        logger.info("Calculating depressurization conditions...")
         # Initial Conditions
         t = 0
         i = 0
@@ -642,6 +647,7 @@ class ThrusterModel:
             thr_curr = flow_result.thr
             thr_depress_array.append(thr_curr)
             if i % 10 == 0:
+                logger.info(f"Iteration: {i:.0f} of {max_iterations:.0f}")
                 yield (UI_input, flow_result, t, P_curr, m_curr, thr_curr,
                        T_curr, i / max_iterations)
 
@@ -660,4 +666,5 @@ class ThrusterModel:
             thr_depress_array,
             temp_depress_array,
         )
+        logger.info("Depressurization complete.")
         return depress_result
