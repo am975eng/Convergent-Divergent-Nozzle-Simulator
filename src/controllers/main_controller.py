@@ -73,7 +73,8 @@ class ThrusterController(QObject):
         UI_input = self.view.extract_UI_data()
         UI_input, flow_result = self.model.calc_thermo(UI_input)
         opt_worker = Worker(
-            self.model.calc_opt_geom, UI_input, flow_result, 1000)
+            self.model.calc_opt_geom, UI_input, flow_result, 1000
+        )
         opt_worker.signals.progress.connect(self.on_optimize_progress)
         opt_worker.signals.finished.connect(self.on_optimize_finished)
         self.threadpool.start(opt_worker)
@@ -92,8 +93,7 @@ class ThrusterController(QObject):
         UI_input = self.view.extract_UI_data()
         result = self.model.calc_thermo(UI_input)
         UI_input, flow_result = result
-        depress_worker = Worker(
-            self.model.calc_depress, UI_input, flow_result)
+        depress_worker = Worker(self.model.calc_depress, UI_input, flow_result)
         depress_worker.signals.progress.connect(self.on_depress_progress)
         depress_worker.signals.finished.connect(self.on_depress_finished)
         self.threadpool.start(depress_worker)

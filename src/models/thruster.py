@@ -37,7 +37,9 @@ class FlowResults:
     x_over_shock: list
     y_over_shock: list
 
+
 logger = setup_logger(__name__)
+
 
 class ThrusterModel:
     """
@@ -95,7 +97,9 @@ class ThrusterModel:
                 args=(UI_input.M_star, A_outlet, A_star, UI_input.k),
             ).root
         except ValueError as e:
-            logger.error("Failed to calculate Mach numbers at exit, expand root_scalar solution bracket to solve.")
+            logger.error(
+                "Failed to calculate Mach numbers at exit, expand root_scalar solution bracket to solve."
+            )
 
         # Preallocation
         P_array = np.zeros(len(x_conv) + len(x_div))
@@ -234,7 +238,9 @@ class ThrusterModel:
                 T_array[shift] = T_x
 
         elif UI_input.P_amb > P_e_shock:
-            logger.info("Back pressure is low enough for choked supersonic flow with possible normal shock")
+            logger.info(
+                "Back pressure is low enough for choked supersonic flow with possible normal shock"
+            )
             for index in range(len(x_div)):
                 A_x = math.pi * (y_div[index] ** 2)
                 shift = index + len(x_conv)
@@ -459,7 +465,7 @@ class ThrusterModel:
 
         return UI_input, flow_result
 
-    def calc_opt_geom(self, UI_input, flow_result, max_iterations=200):
+    def calc_opt_geom(self, UI_input, flow_result, max_iterations=600):
         """
         Calculates the optimal nozzle geometry using a gradient descent
         algorithm with an ADAM optimizer to match design thrust.
@@ -471,15 +477,6 @@ class ThrusterModel:
             learning_rate (float) - Learning rate for optimizer
             progress_callback (None) - Marker
         """
-        logger.info("Calculating optimal nozzle geometry...")
-        A_star = math.pi * (UI_input.r_throat**2)
-        A_inlet = math.pi * (UI_input.r_inlet**2)
-        A_outlet = math.pi * (UI_input.r_outlet**2)
-        area_ratio_outlet = A_outlet / A_star
-        area_ratio_inlet = A_inlet / A_star
-        tol = 0.0005  # Tolerance for convergence
-        learning_rate = 0.01 * UI_input.r_throat
-        optimizer = ADAM_Optimizer(learning_rate)
 
         def calc_cost(UI_input):
             """
@@ -491,9 +488,7 @@ class ThrusterModel:
             result = self.calc_thermo(UI_input)
             flow_result = result[1]
             thr_curr = flow_result.thr
-            return (
-                (thr_curr - UI_input.thr_design) / UI_input.thr_design
-            ) ** 2, flow_result
+            return ((thr_curr - UI_input.thr_design) ** 2, flow_result)
 
         def calc_gradient(UI_input):
             """
@@ -537,19 +532,35 @@ class ThrusterModel:
 
             return (cost_plus - cost_minus) / (2 * delta)
 
+        logger.info("Calculating optimal nozzle geometry...")
+        A_star = math.pi * (UI_input.r_throat**2)
+        A_inlet = math.pi * (UI_input.r_inlet**2)
+        A_outlet = math.pi * (UI_input.r_outlet**2)
+        area_ratio_outlet = A_outlet / A_star
+        area_ratio_inlet = A_inlet / A_star
+        tol = UI_input.thr_design / 200  # Tolerance for convergence
+        dT_dr = calc_gradient(UI_input)
+        learning_rate = 0.001
+        optimizer = ADAM_Optimizer(learning_rate)
+
         for iteration in range(max_iterations):
             time.sleep(0.25)
             cost_curr, flow_result = calc_cost(UI_input)
 
             if abs(cost_curr) < tol:
-                logger.info(f"Convergence achieved after {iteration:.0f} iterations")
+                logger.info(
+                    f"Convergence achieved after {iteration:.0f} iterations"
+                )
                 return UI_input, flow_result
 
             gradient = calc_gradient(UI_input)
             update = optimizer.update(gradient)
+            print(f"Update: {update}")
 
             if iteration % 4 == 0:
-                logger.info(f"Iteration {iteration:.0f} of {max_iterations:.0f} complete")
+                logger.info(
+                    f"Iteration {iteration:.0f} of {max_iterations:.0f}"
+                )
                 yield UI_input, flow_result, int(
                     100 * iteration / max_iterations
                 )
@@ -563,7 +574,9 @@ class ThrusterModel:
             ) ** 0.5
 
         else:
-            logger.error(f"Convergence failed after {max_iterations:.0f} iterations")
+            logger.error(
+                f"Convergence failed after {max_iterations:.0f} iterations"
+            )
 
     def calc_depress(self, UI_input, flow_result, max_iterations=100):
         """
@@ -648,8 +661,16 @@ class ThrusterModel:
             thr_depress_array.append(thr_curr)
             if i % 10 == 0:
                 logger.info(f"Iteration: {i:.0f} of {max_iterations:.0f}")
-                yield (UI_input, flow_result, t, P_curr, m_curr, thr_curr,
-                       T_curr, i / max_iterations)
+                yield (
+                    UI_input,
+                    flow_result,
+                    t,
+                    P_curr,
+                    m_curr,
+                    thr_curr,
+                    T_curr,
+                    i / max_iterations,
+                )
 
         P_depress_array = np.array(P_depress_array)
         m_depress_array = np.array(m_depress_array)

@@ -1,11 +1,12 @@
 import unittest
 import sys
+import logging
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from dataclasses import dataclass
-from ..src.models.thruster import ThrusterModel
+from models.thruster import ThrusterModel
 
 
 @dataclass
@@ -30,6 +31,9 @@ class UIInputs:
     thr_design: float
     noz_type: str
     depress_type: int
+
+
+logging.disable(logging.CRITICAL)
 
 
 class TestCDNozzle(unittest.TestCase):
@@ -79,7 +83,7 @@ class TestCDNozzle(unittest.TestCase):
             depress_type,
         )
 
-    def test_model_thermo_vacuum(self):
+    def test_thermo_vacuum(self):
         # Vacuum back pressure test
         self.UI_input.P_amb = 0
         self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
@@ -100,7 +104,7 @@ class TestCDNozzle(unittest.TestCase):
         # A shock at throat should yield higher pressure than exit shock
         self.assertGreater(flow_result.P_star_shock, flow_result.P_e_shock)
 
-    def test_model_thermo_shock(self):
+    def test_thermo_shock(self):
         # Check if normal shock can be handled
         self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
         self.UI_input.P_amb = (
@@ -112,6 +116,40 @@ class TestCDNozzle(unittest.TestCase):
         self.assertAlmostEqual(
             flow_result.P_e, self.UI_input.P_amb, delta=flow_result.P_e / 100
         )
+
+    def test_opt_geom_min(self):
+        self.UI_input.r_throat = 1e-5
+        self.UI_input.r_inlet = 1e-4
+        self.UI_input.r_outlet = 1e-4
+
+        self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
+        self.assertIsNotNone(flow_result)
+        self.UI_input.thr_design = 100
+        for opt_output in self.model.calc_opt_geom(
+            self.UI_input, flow_result, 1000
+        ):
+            self.UI_input, flow_result, itx = opt_output
+            print(itx)
+            print(flow_result.thr)
+        self.assertAlmostEqual(
+            flow_result.thr,
+            self.UI_input.thr_design,
+            delta=self.UI_input.thr_design / 100,
+        )
+
+    # def test_opt_geom_max(self):
+    #     self.UI_input.r_throat = 1e5
+    #     self.UI_input.r_inlet = 1e6
+    #     self.UI_input.r_outlet = 1e6
+
+    #     self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
+    #     self.assertIsNotNone(flow_result)
+    #     try:
+    #         while True:
+    #             opt_output = next(self.model.calc_opt_geom(self.UI_input, flow_result))
+    #     except StopIteration:
+    #         self.UI_input, flow_result = opt_output
+    #     self.assertAlmostEqual(flow_result.thr, self.UI_input.thr_design, delta=self.UI_input.thr_design / 100)
 
 
 if __name__ == "__main__":
