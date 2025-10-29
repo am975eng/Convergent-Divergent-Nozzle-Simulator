@@ -488,7 +488,7 @@ class ThrusterModel:
             result = self.calc_thermo(UI_input)
             flow_result = result[1]
             thr_curr = flow_result.thr
-            return ((thr_curr - UI_input.thr_design) ** 2, flow_result)
+            return ((thr_curr - UI_input.thr_design), flow_result)
 
         def calc_gradient(UI_input):
             """
@@ -496,53 +496,53 @@ class ThrusterModel:
             dT/dUI_input.r_throat.
 
             Inputs:
-                delta (float) - Small increment to throat radius for numerical
+                delta (float) - Small increment to throat area for numerical
                 differentiation
 
             Returns:
                 (float) - Gradient of thrust with respect to throat radius
             """
-            delta = UI_input.r_throat * 0.01
-            UI_input.r_throat += delta
-            UI_input.r_outlet = (
-                (UI_input.r_throat**2) * area_ratio_outlet
-            ) ** 0.5
-            UI_input.r_inlet = (
-                (UI_input.r_throat**2) * area_ratio_inlet
-            ) ** 0.5
-
+            area_throat = np.pi * (UI_input.r_throat**2)
+            delta = area_throat * 0.01
+            area_throat += delta
+            UI_input.r_throat = (area_throat / np.pi) ** 0.5
+            area_outlet = area_throat * area_ratio_outlet
+            UI_input.r_outlet = (area_outlet / np.pi) ** 0.5
+            area_inlet = area_throat * area_ratio_inlet
+            UI_input.r_inlet = (area_inlet / np.pi) ** 0.5
             cost_plus, _ = calc_cost(UI_input)
-            UI_input.r_throat -= 2 * delta
-            UI_input.r_outlet = (
-                (UI_input.r_throat**2) * area_ratio_outlet
-            ) ** 0.5
-            UI_input.r_inlet = (
-                (UI_input.r_throat**2) * area_ratio_inlet
-            ) ** 0.5
+            
+            area_throat -= 2 * delta
+            UI_input.r_throat = (area_throat / np.pi) ** 0.5
+            area_outlet = area_throat * area_ratio_outlet
+            UI_input.r_outlet = (area_outlet / np.pi) ** 0.5
+            area_inlet = area_throat * area_ratio_inlet
+            UI_input.r_inlet = (area_inlet / np.pi) ** 0.5
             cost_minus, _ = calc_cost(UI_input)
 
             # Return UI_input to original
-            UI_input.r_throat += delta
-            UI_input.r_outlet = (
-                (UI_input.r_throat**2) * area_ratio_outlet
-            ) ** 0.5
-            UI_input.r_inlet = (
-                (UI_input.r_throat**2) * area_ratio_inlet
-            ) ** 0.5
+            area_throat += delta
+            UI_input.r_throat = (area_throat / np.pi) ** 0.5
+            area_outlet = area_throat * area_ratio_outlet
+            UI_input.r_outlet = (area_outlet / np.pi) ** 0.5
+            area_inlet = area_throat * area_ratio_inlet
+            UI_input.r_inlet = (area_inlet / np.pi) ** 0.5
+            cost_plus, _ = calc_cost(UI_input)
 
             return (cost_plus - cost_minus) / (2 * delta)
 
         logger.info("Calculating optimal nozzle geometry...")
-        A_star = math.pi * (UI_input.r_throat**2)
-        A_inlet = math.pi * (UI_input.r_inlet**2)
-        A_outlet = math.pi * (UI_input.r_outlet**2)
-        area_ratio_outlet = A_outlet / A_star
-        area_ratio_inlet = A_inlet / A_star
+        area_throat = math.pi * (UI_input.r_throat**2)
+        area_inlet = math.pi * (UI_input.r_inlet**2)
+        area_outlet = math.pi * (UI_input.r_outlet**2)
+        area_ratio_outlet = area_outlet / area_throat
+        area_ratio_inlet = area_inlet / area_throat
         tol = UI_input.thr_design / 200  # Tolerance for convergence
-        dT_dr = calc_gradient(UI_input)
-        learning_rate = 0.001
+        dC_dr = calc_gradient(UI_input)
+        cost_curr = calc_cost(UI_input)[0]
+        learning_rate = (1/dC_dr) * cost_curr * 0.1
         optimizer = ADAM_Optimizer(learning_rate)
-
+        
         for iteration in range(max_iterations):
             time.sleep(0.25)
             cost_curr, flow_result = calc_cost(UI_input)
@@ -554,8 +554,8 @@ class ThrusterModel:
                 return UI_input, flow_result
 
             gradient = calc_gradient(UI_input)
-            update = optimizer.update(gradient)
-            print(f"Update: {update}")
+            learn_rate = (1/dC_dr) * cost_curr * 0.1
+            update = optimizer.update(gradient, learn_rate)
 
             if iteration % 4 == 0:
                 logger.info(
@@ -565,14 +565,13 @@ class ThrusterModel:
                     100 * iteration / max_iterations
                 )
 
-            UI_input.r_throat -= update
-            UI_input.r_outlet = (
-                (UI_input.r_throat**2) * area_ratio_outlet
-            ) ** 0.5
-            UI_input.r_inlet = (
-                (UI_input.r_throat**2) * area_ratio_inlet
-            ) ** 0.5
-
+            area_throat -= update
+            UI_input.r_throat = (area_throat / np.pi) ** 0.5
+            area_outlet = area_throat * area_ratio_outlet
+            UI_input.r_outlet = (area_outlet / np.pi) ** 0.5
+            area_inlet = area_throat * area_ratio_inlet
+            UI_input.r_inlet = (area_inlet / np.pi) ** 0.5
+            
         else:
             logger.error(
                 f"Convergence failed after {max_iterations:.0f} iterations"

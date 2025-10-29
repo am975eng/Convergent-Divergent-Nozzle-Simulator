@@ -1,4 +1,5 @@
 import sys
+import logging
 
 from PyQt6.QtWidgets import QApplication
 
@@ -7,6 +8,7 @@ from models.thruster import ThrusterModel
 from controllers.main_controller import ThrusterController
 
 # Entry point for the application
+logging.disable(logging.CRITICAL)
 app = QApplication(sys.argv)
 view = MainWindow()
 model = ThrusterModel()

@@ -14,7 +14,7 @@ class ADAM_Optimizer:
         self.v = 0  # Adaptive learning rate
         self.t = 0  # Timestep
         
-    def update(self, gradient):
+    def update(self, gradient, learn_rate):
         self.t += 1
         
         # Update biased first moment estimate
@@ -24,13 +24,14 @@ class ADAM_Optimizer:
         self.v = self.beta_2 * self.v + (1 - self.beta_2) * (gradient ** 2)
         
         # Compute bias-corrected first moment estimate
-        m_hat = self.m / (1 - self.beta_1 ** self.t)
+        m_hat = self.m / (1 - (self.beta_1 ** self.t))
         
         # Compute bias-corrected second raw moment estimate
-        v_hat = self.v / (1 - self.beta_2 ** self.t)
+        v_hat = self.v / (1 - (self.beta_2 ** self.t))
         
         # Update parameters
-        update = self.learn_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
+
+        update = learn_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
         
         return update
     
