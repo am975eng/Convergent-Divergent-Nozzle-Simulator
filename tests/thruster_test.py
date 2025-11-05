@@ -2,10 +2,10 @@ import unittest
 import sys
 import logging
 from pathlib import Path
+from dataclasses import dataclass
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
-from dataclasses import dataclass
 from models.thruster import ThrusterModel
 
 
@@ -118,38 +118,94 @@ class TestCDNozzle(unittest.TestCase):
         )
 
     def test_opt_geom_min(self):
+        # Check if minimal geometry can reach high design thrust
         self.UI_input.r_throat = 1e-5
         self.UI_input.r_inlet = 1e-4
         self.UI_input.r_outlet = 1e-4
 
         self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
         self.assertIsNotNone(flow_result)
-        self.UI_input.thr_design = 100
-        for opt_output in self.model.calc_opt_geom(
-            self.UI_input, flow_result, 1000
-        ):
-            self.UI_input, flow_result, itx = opt_output
-            print(itx)
-            print(flow_result.thr)
+
+        self.UI_input.thr_design = 1e5
+        gen = self.model.calc_opt_geom(self.UI_input, flow_result, 1000)
+        try:
+            while True:
+                opt_output = next(gen)
+        except StopIteration as e:
+            self.UI_input, flow_result = e.value
         self.assertAlmostEqual(
             flow_result.thr,
             self.UI_input.thr_design,
             delta=self.UI_input.thr_design / 100,
         )
 
-    # def test_opt_geom_max(self):
-    #     self.UI_input.r_throat = 1e5
-    #     self.UI_input.r_inlet = 1e6
-    #     self.UI_input.r_outlet = 1e6
+    def test_opt_geom_max(self):
+        # Check if maximum geometry can reach low design thrust
+        self.UI_input.r_throat = 1e5
+        self.UI_input.r_inlet = 1e6
+        self.UI_input.r_outlet = 1e6
+        self.UI_input.thr_design = 100
 
-    #     self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
-    #     self.assertIsNotNone(flow_result)
-    #     try:
-    #         while True:
-    #             opt_output = next(self.model.calc_opt_geom(self.UI_input, flow_result))
-    #     except StopIteration:
-    #         self.UI_input, flow_result = opt_output
-    #     self.assertAlmostEqual(flow_result.thr, self.UI_input.thr_design, delta=self.UI_input.thr_design / 100)
+        self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
+        gen = self.model.calc_opt_geom(self.UI_input, flow_result, 1000)
+
+        try:
+            while True:
+                opt_output = next(gen)
+        except StopIteration as e:
+            self.UI_input, flow_result = e.value
+        self.assertAlmostEqual(
+            flow_result.thr,
+            self.UI_input.thr_design,
+            delta=self.UI_input.thr_design / 100,
+        )
+
+    def test_depress_ada(self):
+        self.UI_input.depress_type = "Adiabatic"
+        self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
+        gen = self.model.calc_depress(self.UI_input, flow_result, 100)
+        try:
+            while True:
+                depress_output = next(gen)
+        except StopIteration as e:
+            (
+                UI_input,
+                flow_result,
+                t_depress_array,
+                P_depress_array,
+                m_depress_array,
+                thr_depress_array,
+                temp_depress_array,
+            ) = e.value
+        self.assertAlmostEqual(
+            m_depress_array[-1],
+            m_depress_array[0] * 0.01,
+            delta=m_depress_array[0] * 0.02,
+        )
+
+    def test_depress_iso(self):
+        self.UI_input.depress_type = "Isothermal"
+        self.UI_input, flow_result = self.model.calc_thermo(self.UI_input)
+        gen = self.model.calc_depress(self.UI_input, flow_result, 100)
+        try:
+            while True:
+                depress_output = next(gen)
+        except StopIteration as e:
+            (
+                UI_input,
+                flow_result,
+                t_depress_array,
+                P_depress_array,
+                m_depress_array,
+                thr_depress_array,
+                temp_depress_array,
+            ) = e.value
+
+        self.assertAlmostEqual(
+            m_depress_array[-1],
+            m_depress_array[0] * 0.01,
+            delta=m_depress_array[0] * 0.02,
+        )
 
 
 if __name__ == "__main__":

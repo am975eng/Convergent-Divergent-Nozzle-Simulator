@@ -465,7 +465,7 @@ class ThrusterModel:
 
         return UI_input, flow_result
 
-    def calc_opt_geom(self, UI_input, flow_result, max_iterations=600):
+    def calc_opt_geom(self, UI_input, flow_result, max_iterations=1000):
         """
         Calculates the optimal nozzle geometry using a gradient descent
         algorithm with an ADAM optimizer to match design thrust.
@@ -537,7 +537,7 @@ class ThrusterModel:
         area_outlet = math.pi * (UI_input.r_outlet**2)
         area_ratio_outlet = area_outlet / area_throat
         area_ratio_inlet = area_inlet / area_throat
-        tol = UI_input.thr_design / 200  # Tolerance for convergence
+        tol = UI_input.thr_design / 300  # Tolerance for convergence
         dC_dr = calc_gradient(UI_input)
         cost_curr = calc_cost(UI_input)[0]
         learning_rate = (1/dC_dr) * cost_curr * 0.1
