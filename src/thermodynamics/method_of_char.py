@@ -470,6 +470,41 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
 
     return x_contour, y_contour, x_n, y_n, M_n
 
+def gen_rao_bell(r_throat, r_outlet, k=1.4, print_flag=False, plot_flag=False):
+    """Generates a Rao bell nozzle contour
+
+    Args:
+        r_throat (float) - Throat radius
+        r_outlet (float) - Outlet radius
+        k (float, optional) - Ratio of specific heats. Defaults to 1.4
+        print_flag (bool, optional) - Print MOC results. Defaults False
+        plot_flag (bool, optional) - Plot MOC results. Defaults False
+
+    Returns:
+        x_contour (list) - Contour x coordinates
+        y_contour (list) - Contour y coordinates
+    """
+
+    area_ratio_outlet = r_outlet**2 / r_throat**2
+    theta_circ = np.linspace(-np.pi/2, theta_para_n - np.pi/2, 100)
+    x_circ = 0.382 * r_throat * np.cos(theta_circ)
+    y_circ = 0.382 * r_throat * np.sin(theta_circ) + 0.382 * r_throat + r_throat
+
+    t = np.linspace(0, 1, 100)
+    m_1 = np.tan(theta_para_n)
+    m_2 = np.tan(theta_para_e)
+    N_x = 0.382 * r_throat * np.cos(theta_para_n - np.pi/2)
+    N_y = 0.382 * r_throat * np.sin(theta_para_n - np.pi/2) + 0.382 * r_throat + r_throat
+    E_x = 0.8 * (((area_ratio_outlet**0.5 - 1) - 1) * r_throat)/(np.tan(15*np.pi/180))
+    E_y = ((area_ratio_outlet)**0.5) * r_throat
+    C_1 = N_y - m_1 * N_x
+    C_2 = E_y - m_2 * E_x
+    Q_x = (C_2 - C_1)/(m_1 - m_2)
+    Q_y = (m_1 * C_2 - m_2 * C_1) / (m_1 - m_2)
+    x_contour = ((1-t)**2) * N_x + 2 * (1-t) * t * Q_x + t * t * E_x
+    y_contour = ((1-t)**2) * N_y + 2 * (1-t) * t * Q_y + t * t * E_y
+    return 
+
 if __name__ == "__main__":
     # Test script
     x_contour, y_contour, x_n, y_n, M_n = gen_MOC_MLN(2.4,.5,1.4,7, True, True)

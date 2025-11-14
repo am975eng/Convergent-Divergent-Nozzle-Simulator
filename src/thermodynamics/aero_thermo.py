@@ -5,7 +5,8 @@ Useful thermodynamics, fluid mechanics, and aerodynamics expressions are defined
 """
 
 import numpy as np
-
+from scipy.optimize import curve_fit
+import matplotlib.pyplot as plt
 
 def RS_Area_Mach_X_Y(M_2, M_x, A_y, A_x, k):
     """
@@ -161,3 +162,100 @@ def calc_isotherm_drhodt(rho_0_init, tau, t):
 def calc_ada_dTdt(T_0_init, tau, t, k):
     dTdt = - T_0_init * ((k-1)/tau) * ((1 + ((k-1)/2) * (t/tau))**-3)
     return dTdt
+
+def calc_rao_para_ang(area_ratio_outlet, len_per = 85):
+    theta_n = {60:[4.371, 27.255,
+                5.817, 29.185,
+                8.341, 31.244,
+                13.188, 33.313,
+                20.977, 35.076,
+                32.989, 36.715,
+                55.585, 38.361,
+                80.685, 39.563,
+                ],70:[4.613, 24.745,
+                6.540, 26.619,
+                9.221, 28.309,
+                13.613, 29.881,
+                19.985, 31.268,
+                31.071, 32.844,
+                54.808, 34.678,
+                84.737, 36.070,
+                ],80:[4.415, 22.409,
+                6.187, 24.283,
+                9.239, 25.978,
+                14.363, 27.677,
+                23.515, 29.320,
+                38.060, 30.901,
+                61.965, 32.359,
+                86.426, 33.189],
+                90:[4.682, 20.881,
+                6.452, 22.446,
+                9.633, 24.264,
+                15.859, 26.092,
+                25.372, 27.855,
+                42.989, 29.685,
+                74.534, 31.518,
+                ]}
+    
+    theta_e = {60:[4.347, 20.199,
+6.079, 18.146,
+9.422, 16.532,
+15.735, 15.171,
+26.725, 14.241,
+42.603, 13.488,
+69.886, 12.861,
+],
+                   70:[3.885, 17.305,
+5.622, 15.439,
+8.516, 13.884,
+19.972, 12.004,
+32.393, 11.192,
+50.170, 10.559,
+77.243, 10.110,
+],
+                   80:[3.829, 14.236,
+5.702, 12.312,
+8.736, 10.881,
+14.420, 9.764,
+24.211, 8.832,
+39.494, 8.021,
+63.675, 7.454,
+],
+90:[4.510, 10.878,
+6.832, 9.262,
+11.150, 8.021,
+20.882, 7.039,
+34.448, 6.535,
+52.423, 6.269,
+78.862, 6.063]}
+    def exponential_func(x, a, b, c, d):
+        return a * x + b/x + c*(x**0.5) + d
+
+    x = np.linspace(4, 85, 100)
+    for key in theta_n:
+        x_data = theta_n[key][::2]
+        y_data = theta_n[key][1::2]
+        plt.plot(x_data, y_data, 'r', linewidth=2)
+        popt, pcov = curve_fit(exponential_func, x_data, y_data)
+        a, b, c, d = popt
+        #y = exponential_func(x, a, b, c)
+        y = exponential_func(x, a, b, c, d)
+        plt.plot(x, y, 'b--', linewidth=2)
+
+    for key in theta_e:
+        x_data = theta_e[key][::2]
+        y_data = theta_e[key][1::2]
+        plt.plot(x_data, y_data, 'r', linewidth=2)
+        popt, pcov = curve_fit(exponential_func, x_data, y_data)
+        a, b, c, d = popt
+        #y = exponential_func(x, a, b, c)
+        y = exponential_func(x, a, b, c, d)
+        plt.plot(x, y, 'b--', linewidth=2)
+
+
+        
+    plt.show()
+
+
+
+calc_rao_para_ang(5)
