@@ -27,7 +27,6 @@ import numpy as np
 from scipy.optimize import root_scalar
 from scipy.optimize import curve_fit
 from scipy.interpolate import griddata
-from sklearn.metrics import r2_score
 
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
@@ -470,7 +469,7 @@ def gen_MOC_FLN(M_exit, r_throat, k=1.4, div=7,
 
     return x_contour, y_contour, x_n, y_n, M_n
 
-def gen_rao_bell(r_throat, r_outlet, k=1.4, print_flag=False, plot_flag=False):
+def gen_rao_bell(r_throat, r_outlet, k=1.4, len_per=80, print_flag=False, plot_flag=False):
     """Generates a Rao bell nozzle contour
 
     Args:
@@ -486,6 +485,8 @@ def gen_rao_bell(r_throat, r_outlet, k=1.4, print_flag=False, plot_flag=False):
     """
 
     area_ratio_outlet = r_outlet**2 / r_throat**2
+    theta_para_n, theta_para_e = AT.calc_rao_para_ang(area_ratio_outlet, len_per)
+
     theta_circ = np.linspace(-np.pi/2, theta_para_n - np.pi/2, 100)
     x_circ = 0.382 * r_throat * np.cos(theta_circ)
     y_circ = 0.382 * r_throat * np.sin(theta_circ) + 0.382 * r_throat + r_throat
@@ -495,15 +496,18 @@ def gen_rao_bell(r_throat, r_outlet, k=1.4, print_flag=False, plot_flag=False):
     m_2 = np.tan(theta_para_e)
     N_x = 0.382 * r_throat * np.cos(theta_para_n - np.pi/2)
     N_y = 0.382 * r_throat * np.sin(theta_para_n - np.pi/2) + 0.382 * r_throat + r_throat
-    E_x = 0.8 * (((area_ratio_outlet**0.5 - 1) - 1) * r_throat)/(np.tan(15*np.pi/180))
+    E_x = (len_per/100) * ((area_ratio_outlet**0.5)-1)*r_throat / np.tan(15*np.pi/180)
     E_y = ((area_ratio_outlet)**0.5) * r_throat
     C_1 = N_y - m_1 * N_x
     C_2 = E_y - m_2 * E_x
     Q_x = (C_2 - C_1)/(m_1 - m_2)
     Q_y = (m_1 * C_2 - m_2 * C_1) / (m_1 - m_2)
-    x_contour = ((1-t)**2) * N_x + 2 * (1-t) * t * Q_x + t * t * E_x
-    y_contour = ((1-t)**2) * N_y + 2 * (1-t) * t * Q_y + t * t * E_y
-    return 
+    x_expand = ((1-t)**2) * N_x + 2 * (1-t) * t * Q_x + t * t * E_x
+    y_expand = ((1-t)**2) * N_y + 2 * (1-t) * t * Q_y + t * t * E_y
+
+    x_contour = np.append(x_circ, x_expand)
+    y_contour = np.append(y_circ, y_expand)
+    return x_contour, y_contour
 
 if __name__ == "__main__":
     # Test script
@@ -528,4 +532,8 @@ if __name__ == "__main__":
     plt.axis('equal')
 
     x_contour, y_contour, x_n, y_n, M_n = gen_MOC_FLN(2.5,.5,1.4,12, True, True)
+
+    x_contour, y_contour = gen_rao_bell(40, 40*(25**0.5))
+    plt.figure()
+    plt.plot(x_contour, y_contour, 'k-', linewidth=2)
     plt.show()

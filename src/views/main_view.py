@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QSizePolicy,
     QPushButton,
-    QProgressBar
+    QProgressBar,
 )
 from PyQt6.QtGui import QDoubleValidator
 from dataclasses import dataclass
@@ -104,7 +104,12 @@ class MainWindow(QMainWindow):
         noz_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.noz_type_list = QComboBox()
         self.noz_type_list.addItems(
-            ["MOC Full Length Nozzle", "MOC Minimum Length Nozzle", "Conical"]
+            [
+                "MOC Full Length Nozzle",
+                "MOC Minimum Length Nozzle",
+                "Conical Nozzle",
+                "Rao Bell Nozzle",
+            ]
         )
         P_chamber_label = QLabel("Chamber Pressure [Pa]")
         P_chamber_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -261,7 +266,7 @@ class MainWindow(QMainWindow):
         h_spacer = QSpacerItem(
             40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
         )
-        option_layout.addWidget(self.progress_bar,16,0, 1, 1)
+        option_layout.addWidget(self.progress_bar, 16, 0, 1, 1)
         option_layout.addWidget(self.calc_button, 16, 1, 1, 1)
         option_layout.addItem(v_spacer, 17, 0, 1, 2)
 
@@ -314,7 +319,8 @@ class MainWindow(QMainWindow):
             {Background-color: white; color: black;}"""
 
         self.canvas.axes.set_title(
-            "Centerline Values", color="white", fontsize=10)
+            "Centerline Values", color="white", fontsize=10
+        )
         self.canvas.axes.set_ylabel("Y Position [m]", color="white")
         self.canvas.axes_mass.set_title(
             "Depressurization Values", color="white", fontsize=10
@@ -400,7 +406,10 @@ class MainWindow(QMainWindow):
         )
 
     def update_UI_nozzle(self):
-        if self.noz_type_list.currentText() == "MOC Full Length Nozzle" or self.noz_type_list.currentText() == "MOC Minimum Length Nozzle":
+        if (
+            self.noz_type_list.currentText() == "MOC Full Length Nozzle"
+            or self.noz_type_list.currentText() == "MOC Minimum Length Nozzle"
+        ):
             self.converg_ang_val.setEnabled(False)
             self.converg_ang_val.setStyleSheet(self.grey_out_style)
             self.diverg_angle_val.setEnabled(False)
@@ -409,7 +418,10 @@ class MainWindow(QMainWindow):
             self.radius_outlet_val.setStyleSheet(self.grey_out_style)
             self.M_exit_moc_val.setEnabled(True)
             self.M_exit_moc_val.setStyleSheet(self.grey_out_style)
-        elif self.noz_type_list.currentText() == "Conical":
+        elif (
+            self.noz_type_list.currentText() == "Conical Nozzle"
+            or self.noz_type_list.currentText() == "Rao Bell Nozzle"
+        ):
             self.converg_ang_val.setEnabled(True)
             self.converg_ang_val.setStyleSheet(self.grey_out_style)
             self.diverg_angle_val.setEnabled(True)
@@ -418,7 +430,6 @@ class MainWindow(QMainWindow):
             self.radius_outlet_val.setStyleSheet(self.grey_out_style)
             self.M_exit_moc_val.setEnabled(False)
             self.M_exit_moc_val.setStyleSheet(self.grey_out_style)
-
 
     def print_results(self, flow_result):
         """Update UI display table with results."""
@@ -595,7 +606,7 @@ class MainWindow(QMainWindow):
         )
         self.print_results(flow_result)
 
-        self.progress_bar.setValue(int(i*100))
+        self.progress_bar.setValue(int(i * 100))
 
         self.canvas.axes_depress.scatter(t, P_curr, color="g")
         self.canvas.axes_mass.scatter(t, m_curr, color="r")
@@ -660,7 +671,6 @@ class MainWindow(QMainWindow):
             self.progress_bar.setValue(100)
             self.calc_button.setEnabled(True)
             self.calc_button.setStyleSheet("background-color: green;")
-
 
 
 class MplCanvas(FigureCanvas):

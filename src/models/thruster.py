@@ -81,9 +81,13 @@ class ThrusterModel:
             )
             UI_input.r_outlet = np.max(y_div)
             A_outlet = math.pi * (UI_input.r_outlet**2)
-        elif UI_input.noz_type == "Conical":
+        elif UI_input.noz_type == "Conical Nozzle":
             x_div = np.linspace(0, diverg_length, res)
             y_div = UI_input.r_throat + x_div * np.tan(UI_input.diverg_angle)
+        elif UI_input.noz_type == "Rao Bell Nozzle":
+            x_div, y_div = MOC.gen_rao_bell(
+                UI_input.r_throat, UI_input.r_outlet, k=UI_input.k, len_per=80
+            )
 
         try:
             M_e_sup = root_scalar(
