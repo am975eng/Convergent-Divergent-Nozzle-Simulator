@@ -4,6 +4,7 @@ import time
 import numpy as np
 from dataclasses import dataclass
 from scipy.optimize import fsolve, root_scalar
+from scipy.stats import norm, uniform
 from CoolProp.CoolProp import PropsSI, AbstractState
 
 from thermodynamics import aero_thermo as AT
@@ -88,6 +89,9 @@ class ThrusterModel:
             x_div, y_div = MOC.gen_rao_bell(
                 UI_input.r_throat, UI_input.r_outlet, k=UI_input.k, len_per=80
             )
+        
+        # Due to fp math div sect may be less than r_throat
+        y_div = y_div + UI_input.r_throat-min(y_div)
 
         try:
             M_e_sup = root_scalar(
@@ -692,3 +696,33 @@ class ThrusterModel:
         )
         logger.info("Depressurization complete.")
         return depress_result
+
+    def calc_monte_carlo(self, UI_input, flow_result, N = 10):
+        logger.info("Running Monte Carlo...")
+        match UI_input.monte_carlo_type:
+            case "Chamber Pressure":
+                mu = UI_input.P_0
+                sigma = mu * 0.01
+                mid = (np.arange(1, N+1) - 0.5) / N      
+                var_array = norm.ppf(mid, loc=mu, scale=sigma)
+                outputs = np.zeros(N)
+                for idx, var in enumerate(var_array):
+                    UI_input.P_0 = var
+                    UI_input, flow_result = self.calc_thermo(UI_input)
+                    outputs[idx] = flow_result.thr
+                    print(idx)
+                return outputs
+            case "Chamber Temperature":
+                pass
+            case "Ambient Pressure":
+                pass
+            case "Throat Radius":
+                pass
+            case "Outlet Radius":
+                pass
+            case "Convergence Angle":
+                pass
+            case "Divergence Angle":
+                pass
+        
+        

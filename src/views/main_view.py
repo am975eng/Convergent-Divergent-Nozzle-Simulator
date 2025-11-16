@@ -47,7 +47,8 @@ class UIInputs:
     M_exit_moc: float
     thr_design: float
     noz_type: str
-    depress_type: int
+    depress_type: str
+    monte_carlo_type: str
 
 
 class MainWindow(QMainWindow):
@@ -135,6 +136,18 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setMinimum(0)
         self.progress_bar.setMaximum(100)
+        self.monte_carlo_type = QComboBox()
+        self.monte_carlo_type.addItems(
+            [
+                "Chamber Pressure",
+                "Chamber Temperature",
+                "Ambient Pressure",
+                "Throat Radius",
+                "Outlet Radius",
+                "Convergence Angle",
+                "Divergence Angle",
+            ]
+        )
 
         length_inlet_label = QLabel("Inlet Length [m]")
         length_inlet_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -165,6 +178,7 @@ class MainWindow(QMainWindow):
         self.depress_type_list = QComboBox()
         self.depress_type_list.addItems(["Isothermal", "Adiabatic"])
         self.depress_button = QPushButton("Depressurize")
+        self.monte_carlo_button = QPushButton("Run Monte Carlo")
         self.calc_button = QPushButton("Run")
 
         # Results Widgets
@@ -237,6 +251,7 @@ class MainWindow(QMainWindow):
             thrust_design_label,
             self.thrust_design_val,
             self.optimize_button,
+            self.monte_carlo_type
         )
         add_to_layout(
             1,
@@ -256,6 +271,7 @@ class MainWindow(QMainWindow):
             depress_type,
             self.depress_type_list,
             self.depress_button,
+            self.monte_carlo_button
         )
         v_spacer = QSpacerItem(
             20,
@@ -266,15 +282,15 @@ class MainWindow(QMainWindow):
         h_spacer = QSpacerItem(
             40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
         )
-        option_layout.addWidget(self.progress_bar, 16, 0, 1, 1)
-        option_layout.addWidget(self.calc_button, 16, 1, 1, 1)
-        option_layout.addItem(v_spacer, 17, 0, 1, 2)
+        option_layout.addWidget(self.progress_bar, 17, 0, 1, 1)
+        option_layout.addWidget(self.calc_button, 17, 1, 1, 1)
+        option_layout.addItem(v_spacer, 18, 0, 1, 2)
 
-        option_layout.addWidget(results_label, 18, 0)
-        option_layout.addWidget(self.result_display_label, 19, 0, 1, 2)
+        option_layout.addWidget(results_label, 19, 0)
+        option_layout.addWidget(self.result_display_label, 20, 0, 1, 2)
         add_to_layout(
             0,
-            20,
+            21,
             P_e_sup_label,
             self.P_e_sup_val,
             P_e_shock_label,
@@ -288,7 +304,7 @@ class MainWindow(QMainWindow):
         )
         add_to_layout(
             1,
-            20,
+            21,
             P_e_sub_label,
             self.P_e_sub_val,
             P_star_shock_label,
@@ -381,6 +397,7 @@ class MainWindow(QMainWindow):
 
         noz_type = self.noz_type_list.currentText()
         depress_type = self.depress_type_list.currentText()
+        monte_carlo_type = self.monte_carlo_type.currentText()
 
         return UIInputs(
             fluid,
@@ -403,6 +420,7 @@ class MainWindow(QMainWindow):
             thr_design,
             noz_type,
             depress_type,
+            monte_carlo_type
         )
 
     def update_UI_nozzle(self):
@@ -655,24 +673,34 @@ class MainWindow(QMainWindow):
             self.optimize_button.setText("Optimizing...")
             self.optimize_button.setEnabled(False)
             self.depress_button.setEnabled(False)
+            self.monte_carlo_button.setEnabled(False)
             self.calc_button.setEnabled(False)
             self.progress_bar.setValue(0)
         elif type == "depress":
             self.depress_button.setText("Depressing...")
             self.optimize_button.setEnabled(False)
             self.depress_button.setEnabled(False)
+            self.monte_carlo_button.setEnabled(False)
             self.calc_button.setEnabled(False)
             self.progress_bar.setValue(0)
+        elif type == "monte_carlo":
+            self.monte_carlo_button.setText("Simulating...")
+            self.monte_carlo_button.setEnabled(False)
+            self.optimize_button.setEnabled(False)
+            self.depress_button.setEnabled(False)
+            self.monte_carlo_button.setEnabled(False)
+            self.calc_button.setEnabled(False)
         elif type == "finished":
             self.optimize_button.setText("Optimize Geometry")
             self.optimize_button.setEnabled(True)
             self.depress_button.setText("Depressurize")
             self.depress_button.setEnabled(True)
             self.progress_bar.setValue(100)
+            self.monte_carlo_button.setEnabled(True)
+            self.monte_carlo_button.setText("Run Monte Carlo")
             self.calc_button.setEnabled(True)
             self.calc_button.setStyleSheet("background-color: green;")
-
-
+            
 class MplCanvas(FigureCanvas):
     """
     Matplotlib canvas generated using Agg engine that can function as a

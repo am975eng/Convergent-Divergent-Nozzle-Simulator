@@ -36,7 +36,9 @@ class ThrusterController(QObject):
 
         self.view.optimize_button.clicked.connect(self.optimize_geom)
 
-        self.view.depress_button.clicked.connect(self.depress)
+        self.view.depress_button.clicked.connect(self.run_depress)
+
+        self.view.monte_carlo_button.clicked.connect(self.run_monte_carlo)
 
         self.view.calc_button.clicked.connect(self.update_result)
 
@@ -88,7 +90,7 @@ class ThrusterController(QObject):
         self.view.plot_flow_data(UI_input, flow_result)
         self.view.set_busy_state("finished")
 
-    def depress(self):
+    def run_depress(self):
         self.view.set_busy_state("depress")
         UI_input = self.view.extract_UI_data()
         result = self.model.calc_thermo(UI_input)
@@ -103,4 +105,18 @@ class ThrusterController(QObject):
 
     def on_depress_finished(self, depress_result):
         self.view.plot_depress_final(depress_result)
+        self.view.set_busy_state("finished")
+
+    def run_monte_carlo(self):
+        self.view.set_busy_state("monte_carlo")
+        UI_input = self.view.extract_UI_data()
+        result = self.model.calc_thermo(UI_input)
+        UI_input, flow_result = result
+        mc_worker = Worker(self.model.calc_monte_carlo, UI_input, flow_result)
+        mc_worker.signals.result.connect(self.on_mc_finished)
+        self.threadpool.start(mc_worker)
+
+    def on_mc_finished(self, outputs):
+        print("Finished")
+        print(outputs)
         self.view.set_busy_state("finished")
