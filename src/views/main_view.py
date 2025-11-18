@@ -144,9 +144,7 @@ class MainWindow(QMainWindow):
                 "Chamber Temperature",
                 "Ambient Pressure",
                 "Throat Radius",
-                "Outlet Radius",
-                "Convergence Angle",
-                "Divergence Angle",
+                "Outlet Radius"
             ]
         )
 
@@ -642,11 +640,11 @@ class MainWindow(QMainWindow):
             depress_result (tuple) - Tuple containing the following:
                 UI_input (dataclass) - User inputs
                 flow_result (dataclass) - Flow results
-                t_depress_array (list) - Time array
-                P_depress_array (list) - Pressure array
-                m_depress_array (list) - Mass array
-                thr_depress_array (list) - Thrust array
-                temp_depress_array (list) - Temperature array
+                t_depress_array (np.array) - Time array
+                P_depress_array (np.array) - Pressure array
+                m_depress_array (np.array) - Mass array
+                thr_depress_array (np.array) - Thrust array
+                temp_depress_array (np.array) - Temperature array
         """
         (
             UI_input,
@@ -703,13 +701,19 @@ class MainWindow(QMainWindow):
             self.calc_button.setStyleSheet("background-color: green;")
 
     def plot_monte_carlo(self, mc_thrust_array):
+        """Plots Monte Carlo results including thrust histogram and a normal
+        PDF fit.
+
+        Inputs:
+            mc_thrust_array (np.array) - Array of thrust samples
+        """
         mu, sigma = ss.norm.fit(mc_thrust_array)
         x = np.linspace(mu - 4*sigma, mu + 4*sigma, 500)
         pdf = ss.norm.pdf(x, mu, sigma)
 
         plt.figure()
         plt.plot(x, pdf, 'r-', linewidth=2, label="Normal PDF fit")
-        plt.hist(mc_thrust_array, bins=30, density=True, label="Histogram")
+        plt.hist(mc_thrust_array, density=True, label="Histogram")
         plt.xlabel("Thrust [N]")
         plt.ylabel("Probability Density")
         plt.title("Monte Carlo Simulation of Thrust")

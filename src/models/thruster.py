@@ -697,7 +697,22 @@ class ThrusterModel:
         logger.info("Depressurization complete.")
         return depress_result
 
-    def calc_monte_carlo(self, UI_input, flow_result, N=30, sigma_frac=0.01):
+    def calc_monte_carlo(self, UI_input, flow_result, N=50, sigma_frac=0.01):
+        """Runs a Monte Carlo simulation using linear hypercube scaling of an
+        input parameter to predict thrust variance.
+
+        Assumes input parameter is normally distributed with a standard
+        deviation that is a fraction of the mean.
+
+        Inputs:
+            UI_input (dataclass) - User inputs
+            flow_result (dataclass) - Flow results
+            N (int) - Number of samples to generate
+            sigma_frac (float) - fraction of mean used as standard deviation
+        Returns:
+            mc_thrust_array (np.array) - Array of thrust samples
+        """
+
         logger.info("Running Monte Carlo...")
         param_map = {
             "Chamber Pressure": "P_0",
@@ -705,8 +720,6 @@ class ThrusterModel:
             "Ambient Pressure": "P_amb",
             "Throat Radius": "r_throat",
             "Outlet Radius": "r_outlet",
-            "Convergence Angle": "converg_angle",
-            "Divergence Angle": "diverg_angle",
         }
 
         param = param_map[UI_input.monte_carlo_type]
@@ -719,7 +732,7 @@ class ThrusterModel:
         for idx, var in enumerate(input_var_array):
             # Check if variance doesn't produce negative value
             if var < 0:
-                var = 1E-6
+                var = 1e-6
             setattr(UI_input, param, var)
             UI_input, flow_result = self.calc_thermo(UI_input)
             mc_thrust_array[idx] = flow_result.thr
