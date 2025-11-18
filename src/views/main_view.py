@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colors as mpl_colors
 from matplotlib.collections import LineCollection
 import numpy as np
+import scipy.stats as ss
 
 
 @dataclass
@@ -700,6 +701,19 @@ class MainWindow(QMainWindow):
             self.monte_carlo_button.setText("Run Monte Carlo")
             self.calc_button.setEnabled(True)
             self.calc_button.setStyleSheet("background-color: green;")
+
+    def plot_monte_carlo(self, mc_thrust_array):
+        mu, sigma = ss.norm.fit(mc_thrust_array)
+        x = np.linspace(mu - 4*sigma, mu + 4*sigma, 500)
+        pdf = ss.norm.pdf(x, mu, sigma)
+
+        plt.figure()
+        plt.plot(x, pdf, 'r-', linewidth=2, label="Normal PDF fit")
+        plt.hist(mc_thrust_array, bins=30, density=True, label="Histogram")
+        plt.xlabel("Thrust [N]")
+        plt.ylabel("Probability Density")
+        plt.title("Monte Carlo Simulation of Thrust")
+        plt.show()
             
 class MplCanvas(FigureCanvas):
     """

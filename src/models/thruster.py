@@ -89,9 +89,9 @@ class ThrusterModel:
             x_div, y_div = MOC.gen_rao_bell(
                 UI_input.r_throat, UI_input.r_outlet, k=UI_input.k, len_per=80
             )
-        
+
         # Due to fp math div sect may be less than r_throat
-        y_div = y_div + UI_input.r_throat-min(y_div)
+        y_div = y_div + UI_input.r_throat - min(y_div)
 
         try:
             M_e_sup = root_scalar(
@@ -519,7 +519,7 @@ class ThrusterModel:
             area_inlet = area_throat * area_ratio_inlet
             UI_input.r_inlet = (area_inlet / np.pi) ** 0.5
             cost_plus, _ = calc_cost(UI_input)
-            
+
             area_throat -= 2 * delta
             UI_input.r_throat = (area_throat / np.pi) ** 0.5
             area_outlet = area_throat * area_ratio_outlet
@@ -548,9 +548,9 @@ class ThrusterModel:
         tol = UI_input.thr_design / 300  # Tolerance for convergence
         dC_dr = calc_gradient(UI_input)
         cost_curr = calc_cost(UI_input)[0]
-        learning_rate = (1/dC_dr) * cost_curr * 0.1
+        learning_rate = (1 / dC_dr) * cost_curr * 0.1
         optimizer = ADAM_Optimizer(learning_rate)
-        
+
         for iteration in range(max_iterations):
             time.sleep(0.25)
             cost_curr, flow_result = calc_cost(UI_input)
@@ -562,7 +562,7 @@ class ThrusterModel:
                 return UI_input, flow_result
 
             gradient = calc_gradient(UI_input)
-            learn_rate = (1/dC_dr) * cost_curr * 0.1
+            learn_rate = (1 / dC_dr) * cost_curr * 0.1
             update = optimizer.update(gradient, learn_rate)
 
             if iteration % 4 == 0:
@@ -579,7 +579,7 @@ class ThrusterModel:
             UI_input.r_outlet = (area_outlet / np.pi) ** 0.5
             area_inlet = area_throat * area_ratio_inlet
             UI_input.r_inlet = (area_inlet / np.pi) ** 0.5
-            
+
         else:
             logger.error(
                 f"Convergence failed after {max_iterations:.0f} iterations"
@@ -697,32 +697,33 @@ class ThrusterModel:
         logger.info("Depressurization complete.")
         return depress_result
 
-    def calc_monte_carlo(self, UI_input, flow_result, N = 10):
+    def calc_monte_carlo(self, UI_input, flow_result, N=30, sigma_frac=0.01):
         logger.info("Running Monte Carlo...")
-        match UI_input.monte_carlo_type:
-            case "Chamber Pressure":
-                mu = UI_input.P_0
-                sigma = mu * 0.01
-                mid = (np.arange(1, N+1) - 0.5) / N      
-                var_array = norm.ppf(mid, loc=mu, scale=sigma)
-                outputs = np.zeros(N)
-                for idx, var in enumerate(var_array):
-                    UI_input.P_0 = var
-                    UI_input, flow_result = self.calc_thermo(UI_input)
-                    outputs[idx] = flow_result.thr
-                    print(idx)
-                return outputs
-            case "Chamber Temperature":
-                pass
-            case "Ambient Pressure":
-                pass
-            case "Throat Radius":
-                pass
-            case "Outlet Radius":
-                pass
-            case "Convergence Angle":
-                pass
-            case "Divergence Angle":
-                pass
-        
-        
+        param_map = {
+            "Chamber Pressure": "P_0",
+            "Chamber Temperature": "T_0",
+            "Ambient Pressure": "P_amb",
+            "Throat Radius": "r_throat",
+            "Outlet Radius": "r_outlet",
+            "Convergence Angle": "converg_angle",
+            "Divergence Angle": "diverg_angle",
+        }
+
+        param = param_map[UI_input.monte_carlo_type]
+        mu = getattr(UI_input, param)
+        sigma = mu * sigma_frac
+        mid = (np.arange(1, N + 1) - 0.5) / N
+        input_var_array = norm.ppf(mid, loc=mu, scale=sigma)
+        mc_thrust_array = np.zeros(N)
+
+        for idx, var in enumerate(input_var_array):
+            # Check if variance doesn't produce negative value
+            if var < 0:
+                var = 1E-6
+            setattr(UI_input, param, var)
+            UI_input, flow_result = self.calc_thermo(UI_input)
+            mc_thrust_array[idx] = flow_result.thr
+
+        logger.info("Monte Carlo complete")
+
+        return mc_thrust_array

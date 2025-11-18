@@ -116,7 +116,6 @@ class ThrusterController(QObject):
         mc_worker.signals.result.connect(self.on_mc_finished)
         self.threadpool.start(mc_worker)
 
-    def on_mc_finished(self, outputs):
-        print("Finished")
-        print(outputs)
+    def on_mc_finished(self, mc_thrust_array):
+        self.view.plot_monte_carlo(mc_thrust_array)
         self.view.set_busy_state("finished")
