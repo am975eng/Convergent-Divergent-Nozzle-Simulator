@@ -96,6 +96,10 @@ QComboBox {
     color: white;
 }
 
+QComboBox QAbstractItemView {
+    color: white;
+}
+
 QPushButton {
     color: white;
 }

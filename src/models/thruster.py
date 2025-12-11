@@ -91,7 +91,8 @@ class ThrusterModel:
             )
 
         # Due to fp math div sect may be less than r_throat
-        y_div = y_div + UI_input.r_throat - min(y_div)
+        if UI_input.r_throat < np.min(y_div):
+            y_div = y_div + ((UI_input.r_throat - np.min(y_div)) * 1.5)
 
         try:
             M_e_sup = root_scalar(
@@ -360,8 +361,9 @@ class ThrusterModel:
             logger.info(result_display)
             # Divergent section - Supersonic flow
             for index in range(len(x_div)):
-                A_x = math.pi * (y_div[index] * y_div[index])
+                A_x = math.pi * (y_div[index] ** 2)
                 shift = index + len(x_conv)
+                
                 M_x_sup = root_scalar(
                     AT.RS_Area_Mach_X_Y,
                     bracket=[1, 100],
@@ -607,8 +609,6 @@ class ThrusterModel:
         rho_curr = PropsSI("D", "P", P_curr, "T", T_curr, UI_input.fluid)
         m_curr = V_init * rho_curr
         A_star = math.pi * (UI_input.r_throat**2)
-        A_inlet = math.pi * (UI_input.r_inlet**2)
-        A_outlet = math.pi * (UI_input.r_outlet**2)
         C_d = 1
 
         P_depress_array = []
