@@ -91,9 +91,8 @@ class ThrusterModel:
             )
 
         # Due to fp math div sect may be less than r_throat
-        if UI_input.r_throat < np.min(y_div):
+        if UI_input.r_throat > np.min(y_div):
             y_div = y_div + ((UI_input.r_throat - np.min(y_div)) * 1.5)
-
         try:
             M_e_sup = root_scalar(
                 AT.RS_Area_Mach_X_Y,
@@ -363,7 +362,7 @@ class ThrusterModel:
             for index in range(len(x_div)):
                 A_x = math.pi * (y_div[index] ** 2)
                 shift = index + len(x_conv)
-                
+
                 M_x_sup = root_scalar(
                     AT.RS_Area_Mach_X_Y,
                     bracket=[1, 100],

@@ -15,9 +15,9 @@
 
 ## Features
 - 1D, steady, adiabatic, isentropic flow solver
+- Thrust design using gradient descent algorithm with ADAM optimizer 
 - Prandtl-Meyer and oblique shockwave plotting for overexpanded and underexpanded jets respectively
 - Method of characteristics nozzle contour generator
-- Thrust design using gradient descent algorithm with ADAM optimizer 
 - Cross-platform support (Windows/macOS/Linux) PyQt6 GUI
 
 # Table of Contents
@@ -27,7 +27,7 @@
 - [Basic Usage](#basic-usage)
 
 ## Theory
-Initially the code assumes **1D steady adiabatic isentropic** flow with an ideal gas of constant specific heats. The code begins by calculating supersonic and subsonic critical exit pressures by using the area-Mach relation assuming choked flow. It then compares ambient pressure to critical pressure conditions to determine the type of flow produced.
+Initially the code assumes **1D steady adiabatic isentropic** flow with an ideal gas of constant specific heats. The code generates either a method of characteristics nozzle, conical, or Rao bell nozzle based on user input. The method of characteristics nozzle uses desired exit mach number and throat radius to cancel out Prandtl-Meyer expansion waves along the straightening section.  Rao bell nozzle uses throat radius, nozzle length, and area-expansion ratio to calculate the thrust optimizied nozzle. The code then calculates supersonic and subsonic critical exit pressures by using the area-Mach relation assuming choked flow. It compares ambient pressure to critical pressure conditions to determine the type of flow produced.
 
 If ambient pressure is above chamber pressure then reverse flow is produced.
 
@@ -108,7 +108,7 @@ Starting with initially defined fluid properties, we can generate characteristic
 
 ## Basic Usage
 ### User Inputs
-* All user inputs are assumed in SI units. Changing any option recalculates values instantly.
+* All user inputs are assumed in SI units. Changing any option recalculates values instantly. Options not applicable to nozzle type will be **greyed out**.
 
 * **Air, CO2, N2, and Xenon** are available as propellants for analysis.
 
@@ -117,15 +117,26 @@ Starting with initially defined fluid properties, we can generate characteristic
 * **MOC minimum length nozzle** generates a sharper corner at throat with expansion fans canceled out along the contour. It represents the smallest possible length for a nozzle designed by method of characteristics.
 
 * **Conical nozzle option** is based on convergence and divergence angles with respect to throat radius and drawn to inlet and exit radii.
-Options not applicable to nozzle type will be **greyed out**.
+
+* **Rao Bell Nozzle** is based on throat radius, nozzle length, and area-expansion ratio.
 
 * **Chamber pressure and temperature** set stagnation conditions.
 
-* **Ambient pressure** is used to match exit pressure and determine flow type.
+* **Convergence and Divergence angles** are used to generate a conical nozzle.
 
 * **Design Thrust** The thrust optimized for in the gradient descent algorithm. Takes into account momentum and pressure thrust.
 
-* **Optimize** starts the gradient-descent algorithm iterating nozzle geometries until calculated thrust equals designed thrust.
+* **Optimize Geometry** starts the gradient-descent algorithm iterating nozzle geometries until calculated thrust equals designed thrust.
+
+* **Inlet Dimensions** are used to set geometry properties.
+
+* **Ambient pressure** is used to match exit pressure and determine flow type.
+
+* **Depressurization Type** is used to set isothermal or adiabatic assumption during depressurization.
+
+* **Monte Carlo Option** Generates a Monte Carlo test of the selected property.
+
+* **Run** Turns red when current results are outdated, blue when results are being calculated, and green when results are current.
 
 ### Results Summary
 * Label prints out the current flow regime.
@@ -141,6 +152,10 @@ Options not applicable to nozzle type will be **greyed out**.
 * Mass flow rate - Rate of mass transfer through nozzle.
 
 * Exit pressure - Actual exit pressure of the nozzle.
+
+* Propellant mass - Mass of propellant in the nozzle.
+
+* Expansion ratio - Ratio of exit area to throat area.
 
 * Specific impulse - Measure of efficiency a nozzle generates thrust.
 
