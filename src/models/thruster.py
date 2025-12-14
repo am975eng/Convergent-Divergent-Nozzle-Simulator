@@ -697,7 +697,7 @@ class ThrusterModel:
         return depress_result
 
     def calc_monte_carlo(self, UI_input, flow_result, N=50, sigma_frac=0.01):
-        """Runs a Monte Carlo simulation using linear hypercube scaling of an
+        """Runs a Monte Carlo simulation using linear hypercube sampling of an
         input parameter to predict thrust variance.
 
         Assumes input parameter is normally distributed with a standard
