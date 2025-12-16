@@ -715,16 +715,17 @@ class ThrusterModel:
         logger.info("Running Monte Carlo...")
         param_map = {
             "Chamber Pressure": "P_0",
-            "Chamber Temperature": "T_0",
             "Ambient Pressure": "P_amb",
             "Throat Radius": "r_throat",
             "Outlet Radius": "r_outlet",
         }
 
+        mid = (np.arange(1, N + 1) - 0.5) / N
         param = param_map[UI_input.monte_carlo_type]
         mu = getattr(UI_input, param)
+        if mu == 0:
+            mu = 1e-6
         sigma = mu * sigma_frac
-        mid = (np.arange(1, N + 1) - 0.5) / N
         input_var_array = norm.ppf(mid, loc=mu, scale=sigma)
         mc_thrust_array = np.zeros(N)
 

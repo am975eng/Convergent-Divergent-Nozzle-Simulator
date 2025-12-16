@@ -100,13 +100,15 @@ $$\rho_{\text{tank}} = \rho_0 \left[ 1 + \left( \frac{\gamma - 1}{2} \right) \fr
 $$P_{\text{tank}} = P_0 \left[ 1 + \left( \frac{\gamma - 1}{2} \right) \frac{t}{\tau} \right]^{\frac{2\gamma}{1-\gamma}}$$
 $$T_{\text{tank}} = T_0 \left[ 1 + \left( \frac{\gamma - 1}{2} \right) \frac{t}{\tau} \right]^{-2}$$
 
+The depressurization script keeps iterating until tank reaches 1% of initial mass.
+
 ### Monte Carlo
 The Monte Carlo function predicts thrust variance using linear hypercube sampling of a design parameter. As opposed to traditional Monte Carlo runs that generate hundreds of samples which may have blankspots or be computationally intensive, linear hypercube sampling generates one sample at even probability intervals. Assuming throat radius is normally distributed it splits the probability distribution in 20 even bins and selects one sample from each bin. The thermal model then outputs the result for each sample and generates a normal distribution curve using the resulting thrust values.
-  
+
 # Getting Started
 
 ## Prerequisites
-- Python 3.10+
+- Python 3.14+
 - matplotlib 3.10.6+
 - numpy 2.3.3+
 - PyQt6 6.9.1+

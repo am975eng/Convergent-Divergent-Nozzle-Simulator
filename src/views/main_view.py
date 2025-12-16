@@ -141,7 +141,6 @@ class MainWindow(QMainWindow):
         self.monte_carlo_type.addItems(
             [
                 "Chamber Pressure",
-                "Chamber Temperature",
                 "Ambient Pressure",
                 "Throat Radius",
                 "Outlet Radius"
