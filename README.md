@@ -105,6 +105,10 @@ The depressurization script keeps iterating until tank reaches 1% of initial mas
 ### Monte Carlo
 The Monte Carlo function predicts thrust variance using linear hypercube sampling of a design parameter. As opposed to traditional Monte Carlo runs that generate hundreds of samples which may have blankspots or be computationally intensive, linear hypercube sampling generates one sample at even probability intervals. Assuming throat radius is normally distributed it splits the probability distribution in 20 even bins and selects one sample from each bin. The thermal model then outputs the result for each sample and generates a normal distribution curve using the resulting thrust values.
 
+<p align="center">
+    <img src="./assets/Monte_Carlo.PNG" width=50%>
+</p>
+
 # Getting Started
 
 ## Prerequisites
@@ -137,7 +141,7 @@ The Monte Carlo function predicts thrust variance using linear hypercube samplin
 
 4.  Run main script
     ```bash
-    python main.py
+    python src/main.py
     ```
 
 
@@ -199,8 +203,11 @@ The Monte Carlo function predicts thrust variance using linear hypercube samplin
 ## Sources
 
 [1] J. D. Anderson, Jr., Modern Compressible Flow: With Historical Perspective, 4th ed. New York, NY, USA: McGraw-Hill Education, 2021.
+
 [2] S. A. Whitmore, “Introduction to the method of characteristics and the minimum length nozzle,” MAE 5540 – Propulsion Systems, Utah State University. [Online]. Available: http://mae-nas.eng.usu.edu/MAE_5540_Web/propulsion_systems/section8/section.8.1.pdf
+
 [3] S. Asha, G. Dhatri Naga Mohana, K. Sai Priyanka, and D. Govardhan, "Design of Minimum Length Nozzle Using Method of Characteristics," International Journal of Engineering Research and Technology (IJERT), 2021.
+
 [4] M. A. Khan, S. K. Sardiwal, M. V. S. Sharath, and D. H. Chowdary, "Design of a Supersonic Nozzle using Method of Characteristics," International Journal of Engineering Research & Technology (IJERT), vol. 2, no. 11, Nov. 2013.
 
 ## ✉️ Contact  
